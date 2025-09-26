@@ -1,0 +1,49 @@
+dog_photos: https://random.dog/woof.json --> Çıktı: json:
+{
+    "fileSizeBytes": 208151,
+    "url": "https://random.dog/xxxxxguid.jpg"
+} --> Buradaki random oluşturulmuş url'ye istek atıp fotoyu al
+
+dog_facts: https://dogapi.dog/api/v2/facts?limit=1 --> Çıktı json:
+{
+    "data": [
+        {
+            "id": "115fabfe-ea24-42af-afde-2cdcad7a8502",
+            "type": "fact",
+            "attributes": {
+                "body": "Tired puppies get cranky just like little kids. If you have a fussy puppy, try nap time."
+            }
+        }
+    ]
+} --> Buradan body içindeki bilgi alınacak sadece
+
+cat_facts: https://meowfacts.herokuapp.com/ --> json:
+{
+    "data": [
+        "A cat has ran for mayor of Mexico City in 2013."
+    ]
+}
+
+cat_photos: https://api.thecatapi.com/v1/images/search --> json:
+[
+    {
+        "id": "1om",
+        "url": "https://cdn2.thecatapi.com/images/1om.jpg",
+        "width": 500,
+        "height": 339
+    }
+] --> url'yi kullanarak kedi fotoğrafını al
+
+duck_photos = https://random-d.uk/api/v2/random : json:
+{
+    "message": "Powered by random-d.uk",
+    "url": "https://random-d.uk/api/535.jpg"
+} --> url kısmından fotoğrafı al
+
+fox_photos = https://randomfox.ca/floof : json:
+{
+    "image": "https://randomfox.ca/images/79.jpg",
+    "link": "https://randomfox.ca/?i=79"
+} --> image'den fotoyu al
+
+Tüm url'ler --> GET 

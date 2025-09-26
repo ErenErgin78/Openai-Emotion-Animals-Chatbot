@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Duygu Chatbot</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/app.css">
+    <script src="/static/app.js" defer></script>
+    </head>
+<body>
+    <svg id="wires" class="wires"></svg>
+    <svg id="beams" class="wires" style="z-index:2"></svg>
+    <div id="fn-dog_photo" class="func-node">🐶 dog - photo</div>
+    <div id="fn-dog_facts" class="func-node">🐶 dog - facts</div>
+    <div id="fn-cat_photo" class="func-node">🐱 cat - photo</div>
+    <div id="fn-cat_facts" class="func-node">🐱 cat - facts</div>
+    <div id="fn-fox_photo" class="func-node">🦊 fox - photo</div>
+    <div id="fn-duck_photo" class="func-node">🦆 duck - photo</div>
+    <div id="lightbox" class="lightbox" onclick="if(event.target===this) closeLightbox()">
+        <div class="lightbox-content">
+            <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+            <img id="lightbox-img" src="" alt="image" />
+            <a id="lightbox-download" class="lightbox-download" href="#" download>⤓ İndir</a>
+        </div>
+    </div>
+    <canvas id="matrix-canvas"></canvas>
+    <div class="container">
+        <h1>🤖 Animal-Emotion Chatbot
+            <button class="theme-btn" onclick="toggleTheme()">🌗 Tema</button>
+        </h1>
+        <div class="face-container">
+            <div id="face-emoji" class="face-emoji">🙂</div>
+        </div>
+        <div class="controls">
+            <button id="next-btn" class="next-btn" onclick="showNextStep()" disabled>▶ Sonraki</button>
+        </div>
+        <div id="chat-box" class="chat-box"></div>
+        <div class="input-area">
+            <input type="text" id="user-input" placeholder="Mesajınızı yazın..." onkeypress="handleKeyPress(event)">
+            <button id="send-btn" onclick="sendMessage()">Gönder</button>
+        </div>
+        <div class="stats">
+            <div class="stat-box">
+                <strong>İstekler</strong><br>
+                <span id="req-count">0</span>
+            </div>
+        </div>
+        
+    </div>
+</body>
+</html>
+
+
