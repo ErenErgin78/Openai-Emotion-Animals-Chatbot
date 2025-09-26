@@ -6,6 +6,9 @@ Bu proje iki akışı birleştirir:
 
 LLM, kullanıcının mesajından hangi akışın çalışacağını seçer. Hayvan talebi varsa ilgili fonksiyon çağrılır; değilse duygu akışı devreye girer.
 
+## https://github.com/ErenErgin78/Openai-Emotion-Animals-Chatbot
+
+
 ## Özellikler
 
 - 🐶🐱🦊🦆 **Hayvan Fonksiyonları**: dog_photo, dog_facts, cat_photo, cat_facts, fox_photo, duck_photo, help_message

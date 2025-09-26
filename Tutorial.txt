@@ -1,3 +1,7 @@
+https://github.com/ErenErgin78/Openai-Emotion-Animals-Chatbot
+https://github.com/ErenErgin78/Openai-Emotion-Animals-Chatbot
+
+
 dog_photos: https://random.dog/woof.json --> Çıktı: json:
 {
     "fileSizeBytes": 208151,
