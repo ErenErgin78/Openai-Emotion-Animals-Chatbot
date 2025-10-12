@@ -1,168 +1,326 @@
-# Animal & Emotion Chatbot (FastAPI)
+# Akıllı Chatbot Sistemi (FastAPI)
 
-Bu proje iki akışı birleştirir:
-- Hayvan özellikleri: köpek/kedi/tilki/ördek için fotoğraf ve bilgi istekleri (7 fonksiyon).
-- Duygu analizi: Kullanıcı mesajından duygu çıkarımı ve iki aşamalı yanıt.
+Bu proje **üç ana akışı** birleştiren gelişmiş bir chatbot sistemidir:
+- 🧠 **RAG Sistemi**: PDF'lerden bilgi çekme (Python, Anayasa, Clean Architecture)
+- 🐶 **Hayvan Sistemi**: Köpek/kedi/tilki/ördek fotoğraf ve bilgi istekleri
+- 💭 **Duygu Sistemi**: Kullanıcı mesajından duygu analizi ve iki aşamalı yanıt
 
-LLM, kullanıcının mesajından hangi akışın çalışacağını seçer. Hayvan talebi varsa ilgili fonksiyon çağrılır; değilse duygu akışı devreye girer.
+LLM, kullanıcının mesajından hangi akışın çalışacağını akıllıca seçer ve ilgili sistemi devreye sokar.
 
-## https://github.com/ErenErgin78/Openai-Emotion-Animals-Chatbot
+## 🚀 Özellikler
 
+### 🧠 RAG (Retrieval-Augmented Generation) Sistemi
+- **PDF Desteği**: Python, Anayasa, Clean Architecture PDF'lerinden bilgi çekme
+- **Asenkron Model Yükleme**: Site başlatıldığında model arka planda yüklenir
+- **Akıllı Yönlendirme**: Bilgi istekleri otomatik RAG'e yönlendirilir
+- **5 Cümle Sınırı**: Kısa ve öz yanıtlar
+- **PDF Emojileri**: 🐍 Python, ⚖️ Anayasa, 🏗️ Clean Architecture
 
-## Özellikler
+### 🐶 Hayvan Sistemi
+- **7 Fonksiyon**: dog_photo, dog_facts, cat_photo, cat_facts, fox_photo, duck_photo, help_message
+- **API Entegrasyonu**: Gerçek hayvan fotoğrafları ve bilgileri
+- **Görsel Efektler**: Aktif fonksiyonda düğüm/halat parlaması
 
-- 🐶🐱🦊🦆 **Hayvan Fonksiyonları**: dog_photo, dog_facts, cat_photo, cat_facts, fox_photo, duck_photo, help_message
-- 🔌 **LLM Yönlendirme**: Mesajdan niyeti algılar; hayvan talebinde fonksiyon çağırır, aksi halde duygu analizi yapar
-- 💬 **Duygu Analizi**: İki aşamalı (ilk/ikinci duygu ve cevap), emoji desteği
-- 📈 **İstatistikler**: "Bugün en çok..." gibi isteklerde sayımlar
-- 🧠 **UI Eklentileri**: Yan panellerde sürüklenebilir fonksiyon düğümleri ve halat animasyonu
-- ✨ **Görsel Efektler**: Aktif fonksiyonda düğüm/halat parlaması, node→chat ışın animasyonu; duygu akışında container kenarı yeşil parlayışı
-- 🌗 **Tema** ve 🎞️ **Matrix** arkaplan, 📱 mobil uyum
+### 💭 Duygu Analizi Sistemi
+- **İki Aşamalı Yanıt**: İlk/ikinci duygu ve cevap
+- **10 Duygu**: Mutlu, Üzgün, Öfkeli, Şaşkın, Utanmış, Endişeli, Gülümseyen, Flörtöz, Sorgulayıcı, Yorgun
+- **Emoji Desteği**: Her duygu için özel emoji koleksiyonu
+- **İstatistikler**: "Bugün en çok..." gibi isteklerde sayımlar
+- **Yeşil Glow**: Duygu sistemi çalıştığında container kenarı yeşil yanar
+
+### 🎨 Gelişmiş UI/UX
+- **Sürüklenebilir Düğümler**: Yan panellerde fonksiyon düğümleri
+- **Halat Animasyonu**: Düğümler container'a bağlı, fizik simülasyonu
+- **Işın Efekti**: Aktif fonksiyondan chat kutusuna ışın çizimi
+- **Lightbox**: Resim büyütme, kapatma ve indirme
+- **Tema Desteği**: Açık/koyu tema
+- **Matrix Arkaplan**: Animasyonlu arkaplan efekti
+- **Mobil Uyum**: Responsive tasarım
 
 ---
 
-## Proje Dosyaları
+## 🏗️ Proje Mimarisi
 
+### Modüler Sistem Yapısı
 ```
-Duygusal-Ai-Openai/
-  api_web_chatbot.py        # Ana uygulama (FastAPI, tüm akışlar)
-  templates/
-    index.html             # Web sayfası iskeleti (CSS/JS dışarı alındı)
-  static/
-    app.css                # Tüm stiller (yan paneller, halat, lightbox, tema)
-    app.js                 # Tüm istemci JS (chat, yönlendirme, halat fiziği, animasyonlar)
-  data/
-    mood_emojis.json       # Duygu emojileri veritabanı
-    chat_history.txt       # Konuşma geçmişi
-    mood_counter.txt       # Duygu istatistikleri
-  requirements.txt         # Gerekli Python paketleri
-  .env                     # Gizli ayarlar (OpenAI API anahtarı)
-  README.md               # Bu dosya
+├── api_web_chatbot.py     # Ana koordinatör (yönlendirme)
+├── emotion_system.py      # Duygu analizi sistemi
+├── animal_system.py       # Hayvan API sistemi
+├── rag_service.py         # RAG sistemi (PDF + ChromaDB)
+├── static/
+│   ├── app.css           # Tüm stiller
+│   └── app.js            # Frontend mantığı
+├── templates/
+│   └── index.html        # Web sayfası
+├── data/
+│   ├── mood_emojis.json  # Duygu emojileri
+│   ├── chat_history.txt  # Konuşma geçmişi
+│   └── mood_counter.txt  # Duygu istatistikleri
+└── PDFs/                 # RAG için PDF dosyaları
+    ├── Learning_Python.pdf
+    ├── gerekceli_anayasa.pdf
+    └── clean_architecture.pdf
 ```
 
----
-
-## Nasıl Çalışır?
-
-### 1) Web Sunucusu
-- Python ile çalışan web sunucusu
-- Kullanıcı mesajlarını alır, OpenAI'ye gönderir, yanıt döner
-- İki endpoint: ana sayfa (`/`) ve chat (`/chat`)
-
-### 2) Yapay Zeka Motoru ve Yönlendirme
-- OpenAI GPT-3.5-turbo (function calling) ile niyet tespiti
-- Hayvan niyeti: 7 fonksiyondan biri çalışır ve sonuç JSON'u döner
-- Değilse: duygu analizi için özel sistem promptu ile JSON döner (ilk/ikinci duygu+cevap)
-
-### 3) Kullanıcı Arayüzü
-- Yan paneller: sürüklenebilir fonksiyon düğümleri, halat ile `container` kenarına bağlı
-- Düğme tıklama: yazma alanına otomatik prompt doldurur (örn. "Bana bir köpek fotoğrafı ver")
-- Aktif fonksiyon: düğüm/halat yeşil parlayıp chat kutusuna ışın çizilir
-- Duygu akışı: düğümler devreye girmez; `container` kenarı yeşil parlayarak çalışmayı gösterir
-- Lightbox: Resme tıklandığında büyütme, kapatma ve indirme butonu
-- Tema, Matrix efekti, mobil uyum
+### Akıllı Yönlendirme Sistemi
+1. **LLM Analizi**: Mesajı analiz eder (ANIMAL/RAG/EMOTION)
+2. **Sistem Seçimi**: İlgili sistemi devreye sokar
+3. **Yanıt Üretimi**: Seçilen sistem yanıtı üretir
+4. **UI Güncelleme**: Görsel efektler ve emoji güncellemeleri
 
 ---
 
-## Duygu Sistemi
+## 🎯 Kullanım Örnekleri
 
-Bot şu duyguları tanır ve analiz eder:
+### RAG Sistemi (Bilgi Sorguları)
+- **"Python nedir?"** → 🐍 Python PDF'den bilgi + yeşil glow
+- **"Clean Architecture principles"** → 🏗️ Clean Architecture PDF'den bilgi
+- **"Anayasa temel haklar"** → ⚖️ Anayasa PDF'den bilgi
+- **"THE ACYCLIC DEPENDENCIES PRINCIPLE"** → Clean Architecture PDF'den detaylı açıklama
 
-**Temel Duygular**: Mutlu, Üzgün, Öfkeli, Şaşkın, Utanmış, Endişeli, Gülümseyen, Flörtöz, Sorgulayıcı, Yorgun
+### Hayvan Sistemi
+- **"köpek fotoğrafı ver"** → 🐶 Köpek fotoğrafı + düğüm parlaması
+- **"kedi bilgisi ver"** → 🐱 Kedi bilgisi + halat animasyonu
+- **"tilki fotoğrafı ver"** → 🦊 Tilki fotoğrafı + ışın efekti
 
----
-
-## Emoji Veritabanı
-
-Her duygu için özel emoji ve kaomoji (metin yüzler) koleksiyonu:
-
-**Örnek**: Mutlu → 😊, 😄, ^_^, (◠‿◠)
-
-Bot, her duygu için rastgele emoji seçer ve yüz alanında gösterir.
-
----
-
-## Kullanım Örnekleri
-
-### Normal Konuşma (Duygu Akışı)
-- **Siz**: "Bugün çok mutluyum!"
-- **Bot**: İlk aşama: "Mutlu: Harika! Bu güzel haberi duymak beni de mutlu ediyor."
-- **Siz**: "Sonraki" butonuna basın
-- **Bot**: İkinci aşama: "Gülümseyen: Bu pozitif enerjinizi koruyun!"
-
-### İstatistik Sorguları
-### Hayvan İstekleri
-- "köpek fotoğrafı ver" → Köpek fotoğrafı döner, 🐶 düğümü/halatı yeşil parlar ve node→chat ışını oynar
-- "kedi bilgisi ver" → Bir kedi bilgisi döner, 🐱 cat - facts düğümü yeşil parlar
-- "tilki fotoğrafı ver" → Tilki fotoğrafı (redirect fixli), 🦊 düğümü yeşil
-- **Siz**: "Bugün en çok hangi duyguyu yaşadım?"
-- **Bot**: "Bugün 3 kez mutlu, 1 kez endişeli duygularınızı yaşadınız."
+### Duygu Sistemi
+- **"bugün köpeğim öldü :("** → Üzgün emoji + container yeşil glow + iki aşamalı yanıt
+- **"merhaba nasılsın?"** → Mutlu emoji + sohbet
+- **"Bugün en çok hangi duyguyu yaşadım?"** → İstatistik raporu
 
 ---
 
-## Kurulum ve Çalıştırma
+## 🛠️ Kurulum ve Çalıştırma
 
 ### 1. Gereksinimler
-- Python 3.8+ yüklü olmalı
-- OpenAI API anahtarı gerekli
+- Python 3.8+
+- OpenAI API anahtarı
+- 4GB+ RAM (RAG modeli için)
 
 ### 2. Kurulum
 ```bash
-# Gerekli paketleri yükle
+# Bağımlılıkları yükle
 pip install -r requirements.txt
 ```
 
 ### 3. API Anahtarı
-`.env` dosyasını düzenleyin:
+`.env` dosyasını oluşturun:
 ```
 OPENAI_API_KEY=sk-your-api-key-here
 ```
 
-### 4. Çalıştırma
+### 4. PDF Dosyaları
+`PDFs/` klasörüne PDF dosyalarınızı yerleştirin:
+- `Learning_Python.pdf`
+- `gerekceli_anayasa.pdf` 
+- `clean_architecture.pdf`
+
+### 5. Çalıştırma
 ```bash
 # Sunucuyu başlat
-python -m uvicorn api_web_chatbot:app --host 0.0.0.0 --port 8000 --reload
+uvicorn api_web_chatbot:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### 5. Kullanım
-Tarayıcınızda şu adresi açın:
-```
-http://localhost:8000/
-```
+### 6. Kullanım
+Tarayıcınızda: `http://localhost:8000/`
 
-Notlar
-- `.env` içinde `OPENAI_API_KEY` yoksa anahtar kelimeye dayalı yönlendirme devreye girer.
-- `static/` altındaki dosyalar otomatik servis edilir: `/static/app.css` ve `/static/app.js`.
+---
 
-### 6. Sanal Ortam (Önerilir)
+## 🔧 Teknik Detaylar
 
-Windows (PowerShell):
-```powershell
-# Proje klasörüne geç
-cd <project_dir>
+### RAG Sistemi
+- **Embedding Model**: all-MiniLM-L6-v2
+- **Vector Database**: ChromaDB (persistent)
+- **Text Chunking**: 900 karakter, 150 overlap
+- **Batch Processing**: 1000'lik parçalara bölünür
+- **Asenkron Yükleme**: Site başlatıldığında model arka planda yüklenir
 
-# Sanal ortam oluştur (isim serbest)
-python -m venv <venv_name>
+### Hayvan Sistemi
+- **API'ler**: random.dog, thecatapi.com, randomfox.ca, random-d.uk
+- **Fonksiyon Çağırma**: OpenAI function calling
+- **Fallback**: Anahtar kelime tabanlı yönlendirme
 
-# Ortamı aktive et ve bağımlılıkları kur
-./<venv_name>/Scripts/Activate.ps1
-pip install -r requirements.txt
-```
+### Duygu Sistemi
+- **JSON Format**: İlk/ikinci duygu + cevap
+- **Emoji Seçimi**: Rastgele seçim
+- **İstatistik**: Günlük/toplam sayaçlar
+- **Kalıcı Depolama**: JSON dosyaları
 
-macOS / Linux:
-```bash
-# Proje klasörüne geç
-cd <project_dir>
+### Frontend
+- **Vanilla JS**: Framework yok
+- **CSS Grid/Flexbox**: Modern layout
+- **Canvas API**: Matrix efekti
+- **SVG**: Halat animasyonları
+- **WebSocket**: Gerçek zamanlı güncellemeler
 
-# Sanal ortam oluştur (isim serbest)
-python3 -m venv <venv_name>
+---
 
-# Ortamı aktive et ve bağımlılıkları kur
-source <venv_name>/bin/activate
-pip install -r requirements.txt
-```
+## 🏗️ Modüler Mimari Detayları
 
-Devre dışı bırakma:
-```bash
-deactivate
-```
+### api_web_chatbot.py (Ana Koordinatör)
+- FastAPI uygulamasını başlatır, statik dosyaları mount eder
+- `OpenAI` istemcisi oluşturur
+- Uygulama başlangıcında `rag_service.preload_model_async()` ile embedding modelini arka planda yükler
+- **Akış Yönlendirme (Aşama 1)**: `_get_flow_decision(user_message)`
+  - LLM'e sistem mesajı ile üç seçenek verilir: `ANIMAL | RAG | EMOTION`
+  - Mesajda bilgi/teknik terim varsa RAG; hayvan anahtar kelimeleri varsa ANIMAL; aksi halde EMOTION tercih edilir
+- **Akış İşleme (Aşama 2)**:
+  - `RAG` → `_process_rag_flow(user_message)`
+    - Kaynak belirleme (anayasa/clean architecture/python) veya genel arama
+    - RAG sistem prompt'u ile "maksimum 5 cümle" yanıt üretimi
+    - UI'ye `rag_source` ve `rag_emoji` döner (PDF düğümünü yeşil parlatır)
+  - `ANIMAL` → `_process_animal_flow(user_message)`
+    - `animal_system.route_animals` çağrılır; image/text sonucu ve emoji döner
+  - `EMOTION` → `_process_emotion_flow(user_message)`
+    - `EmotionChatbot.chat()` sonucu, istek sayacı ve debug bilgisi döner
+- **HTTP Uç Noktalar**
+  - `GET /` → `templates/index.html`
+  - `POST /chat` → Yukarıdaki yönlendirme akışı
+
+### rag_service.py (RAG Servisi)
+- **Telemetri Kapatma**: PostHog no-op patch (Chroma kaynaklı capture hatalarını engeller)
+- **Kalıcı ChromaDB**: `.chroma/` altında `PersistentClient` kullanır
+- **Embedding**: `SentenceTransformerEmbeddingFunction('all-MiniLM-L6-v2')`
+- **Model Önyükleme**: `preload_model_async()` ile arka planda yüklenir
+- **Koleksiyon**: `project_pdfs` (cosine benzerlik; embedder function iliştirilir)
+- **PDF Okuma**: `pypdf.PdfReader` (yoksa `PyPDF2` fallback)
+- **Chunklama**: `_chunk_text(text, chunk_size=900, chunk_overlap=150)`
+- **İndeksleme**: `ensure_index()`
+  - Mevcut koleksiyon boşsa `PDFs/*.pdf` taranır, text → chunk → `col.add(...)`
+  - Batch ekleme: 1000'lik dilimler; hata halinde 500'lük mini-batch fallback
+- **Sorgu**:
+  - `retrieve_top(query, top_k)` → genel arama
+  - `retrieve_by_source(query, source_filename, top_k)` → kaynağa göre filtreli arama
+
+### emotion_system.py (Duygu Analizi)
+- `EmotionChatbot` sınıfı durum tutar (`messages`, `stats`)
+- **Kalıcı Dosyalar**: `data/mood_emojis.json`, `data/chat_history.txt`, `data/mood_counter.txt`
+- `get_functions()` ile `get_emotion_stats` function-calling desteği
+- `chat(user_message)`:
+  - Sistem prompt'u ile iki aşamalı duygu formatı veya function-calling (istatistik) üretir
+  - Gelen JSON'dan duygu sayaçlarını günceller, random emoji seçer, geçmişe yazar
+
+### animal_system.py (Hayvan API'leri)
+- **Fonksiyonlar**: `dog_photo`, `dog_facts`, `cat_photo`, `cat_facts`, `fox_photo`, `duck_photo`
+- **API'ler**: random.dog, dogapi.dog, meowfacts, thecatapi, randomfox, random-d.uk
+- `route_animals(user_message, client)`:
+  - Ön filtre: hayvan anahtar kelimesi yoksa denemez
+  - OpenAI function-calling ile uygun fonksiyon seçilir; hata/boşlukta keyword fallback çalışır
+
+### Frontend Detayları (static/*)
+
+#### static/app.js
+- **Chat Akışı**: İstek gönderme (`/chat`), durum/emoji güncellemeleri
+- **RAG Yanıtı**: `handleRagResponse` ile tek seferde 5 cümleyi sınırlar; `setActivePdfGlow` ile PDF düğümü/halatı yeşil parlar
+- **Hayvan Yanıtı**: Görsel/text mesaj, ilgili düğümün parlaması ve ışın efekti
+- **Duygu Yanıtı**: İki aşamalı mod (Next butonu), `container` kenarı yeşil `glow-green` efekti
+- **Draggable Düğümler**: Fonksiyon düğümleri, halat fiziği (SVG path), Matrix arkaplan, tema (dark/light)
+
+#### static/app.css
+- **Tema Değişkenleri**: Light/dark, `glow-green` efekti, düğüm/halat stilleri, chat mesajları, lightbox
+
+#### templates/index.html
+- **Düğüm Butonları**: Hayvan ve PDF'ler, matrix canvas, yüz alanı, chat bileşenleri
+
+---
+
+## 🛠️ Sorun Giderme
+
+### Chroma Telemetry / PostHog Hataları
+- `rag_service.py` içinde `ANONYMIZED_TELEMETRY=False`, `CHROMA_TELEMETRY_IMPL=noop`, `POSTHOG_DISABLED=true` ve PostHog capture no-op yamaları uygulanmıştır
+
+### Batch Size Hatası
+- `Batch size XXXX exceeds maximum ...` hatası için indeksleme 1000'lik batch'lere bölünür; hata durumunda 500 mini-batch ile yeniden denenir
+
+### RAG Boyutu Optimizasyonu
+- Chunk değerlerini büyütüp overlap'i düşürmeyi, gereksiz metadata'yı azaltmayı düşünebilirsiniz
+- Chunk size: 1200, overlap: 100 gibi ayarlar deneyebilirsiniz
+
+---
+
+## 🎨 UI/UX Özellikleri
+
+### Görsel Efektler
+- **Yeşil Glow**: Duygu sistemi çalıştığında container kenarı
+- **Düğüm Parlaması**: Aktif hayvan fonksiyonunda
+- **Işın Animasyonu**: Düğümden chat kutusuna
+- **Emoji Değişimi**: Yüz alanında dinamik emoji
+- **Matrix Efekti**: Arka plan animasyonu
+
+### Etkileşim
+- **Sürükle-Bırak**: Düğümleri hareket ettirme
+- **Tıklama**: Otomatik prompt doldurma
+- **Lightbox**: Resim büyütme/küçültme
+- **Tema**: Açık/koyu mod geçişi
+
+---
+
+## 🔮 Gelecek Özellikler
+
+- [ ] Daha fazla PDF desteği
+- [ ] Çoklu dil desteği
+- [ ] Sesli yanıt
+- [ ] Kullanıcı profilleri
+- [ ] Gelişmiş analitik
+- [ ] API dokümantasyonu
+
+---
+
+## 📝 Lisans
+
+Bu proje MIT lisansı altında lisanslanmıştır.
+
+---
+
+## 🤝 Katkıda Bulunma
+
+1. Fork yapın
+2. Feature branch oluşturun (`git checkout -b feature/amazing-feature`)
+3. Commit yapın (`git commit -m 'Add amazing feature'`)
+4. Push yapın (`git push origin feature/amazing-feature`)
+5. Pull Request oluşturun
+
+---
+
+## 🔒 Güvenlik Önlemleri
+
+### Input Sanitization (Giriş Temizleme)
+- **HTML Escape**: Tüm kullanıcı girdileri HTML escape edilir
+- **Tehlikeli Pattern Kontrolü**: Script injection, XSS, iframe injection vb. saldırıları önler
+- **Regex Filtreleme**: JavaScript, VBScript, data URL'leri ve event handler'ları engeller
+
+### Mesaj Uzunluk Sınırları
+- **Ana Sistem**: 2000 karakter maksimum
+- **Duygu Sistemi**: 1000 karakter maksimum  
+- **Hayvan Sistemi**: 500 karakter maksimum
+- **RAG Sistemi**: 1000 karakter maksimum
+
+### Token Koruması
+- **Token Hesaplama**: Türkçe için yaklaşık 1 token = 4 karakter
+- **Maksimum Token**: 1000 token per request
+- **Otomatik Fallback**: Çok fazla token varsa güvenli akışa yönlendirir
+
+### Korunan Saldırı Türleri
+- ✅ **XSS (Cross-Site Scripting)**
+- ✅ **Script Injection**
+- ✅ **Iframe Injection**
+- ✅ **Data URL Attacks**
+- ✅ **Event Handler Injection**
+- ✅ **Token Bombing**
+- ✅ **Message Flooding**
+
+### Güvenlik Logları
+- Tüm tehlikeli pattern tespitlerinde log kaydı
+- Token aşımı durumlarında uyarı
+- Güvenlik filtreleme durumlarında bilgilendirme
+
+### Performans Koruması
+- Aşırı uzun mesajlar engellenir
+- Token limitleri ile maliyet kontrolü
+- Sistem kaynaklarını koruma
+
+---
+
+- **GitHub**: [ErenErgin78/Openai-Emotion-Animals-Chatbot](https://github.com/ErenErgin78/Openai-Emotion-Animals-Chatbot)
+
+---

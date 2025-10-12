@@ -229,6 +229,15 @@
 
                 // Debug bölümleri kaldırıldı
 
+                // RAG (PDF) response branch
+                if (data && (data.rag_source || data.rag_emoji)) {
+                    // RAG için özel davranış: PDF emojisi + tek seferde 5 cümle
+                    handleRagResponse(data);
+                    setActivePdfGlow(data.rag_source, data.rag_emoji);
+                    disableInput(false);
+                    return;
+                }
+
                 // Try parse JSON (ilk/ikinci ruh hali-cevap), fallback to plain text
                 let steps = null;
                 const j = extractJsonObject(data.response);
@@ -266,6 +275,13 @@
                     // Plain text behavior
                     addMessage(data.response, false);
                     if (data.first_emoji) {
+                        // Duygu sistemi: container'ı yeşil yap
+                        try {
+                            const cont = document.querySelector('.container');
+                            cont && cont.classList.add('glow-green');
+                            setTimeout(() => cont && cont.classList.remove('glow-green'), 700);
+                        } catch (_) {}
+                        
                         const node = document.getElementById('face-emoji');
                         if (node) {
                             node.classList.add('anim');
@@ -354,6 +370,36 @@
             document.querySelectorAll('.func-node.active').forEach(n => n.classList.remove('active'));
             document.querySelectorAll('.wire.glow').forEach(n => n.classList.remove('glow'));
         }
+        function setActivePdfGlow(pdfId, emoji) {
+            clearGlow();
+            if (!pdfId) return;
+            const node = document.getElementById('fn-' + pdfId);
+            const wire = document.getElementById('wire-' + pdfId);
+            if (node) node.classList.add('active');
+            if (wire) wire.classList.add('glow');
+            if (emoji) {
+                const face = document.getElementById('face-emoji');
+                if (face) {
+                    face.classList.add('anim');
+                    setTimeout(() => { face.textContent = emoji; face.classList.remove('anim'); fitFaceEmoji(); }, 150);
+                }
+            }
+        }
+
+        function handleRagResponse(data) {
+            // RAG için özel davranış: tek seferde 5 cümle, sonraki tuşu yok
+            const response = data.response || 'Tamam.';
+            
+            // Cümleleri ayır (nokta, ünlem, soru işareti ile)
+            const sentences = response.split(/[.!?]+/).filter(s => s.trim().length > 0);
+            
+            // Maksimum 5 cümle al
+            const limitedSentences = sentences.slice(0, 5);
+            const finalResponse = limitedSentences.join('. ') + (limitedSentences.length < sentences.length ? '...' : '');
+            
+            // Tek seferde tüm mesajı ekle (sonraki tuşu yok)
+            addMessage(finalResponse, false);
+        }
         function quickPrompt(text) {
             const input = document.getElementById('user-input');
             if (!input || input.disabled) return;
@@ -368,6 +414,10 @@
             { id: 'fn-cat_facts', side: 'right', prompt: 'Bana bir kedi bilgisi ver', top: 140, right: 16 },
             { id: 'fn-fox_photo', side: 'right', prompt: 'Bana bir tilki fotoğrafı ver', top: 200, right: 16 },
             { id: 'fn-duck_photo', side: 'right', prompt: 'Bana bir ördek fotoğrafı ver', top: 260, right: 16 },
+            // RAG PDF nodes
+            { id: 'fn-pdf-python', side: 'left', prompt: 'Python PDF bağlamıyla: Python nedir?', top: 320, left: 16 },
+            { id: 'fn-pdf-anayasa', side: 'right', prompt: 'Anayasa PDF bağlamıyla: Temel haklar nedir?', top: 320, right: 16 },
+            { id: 'fn-pdf-clean', side: 'right', prompt: 'Clean Architecture PDF bağlamıyla: Entities nedir?', top: 380, right: 16 },
         ];
 
         // Rope with many segments (full rope)

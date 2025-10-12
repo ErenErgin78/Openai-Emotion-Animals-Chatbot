@@ -71,3 +71,5 @@ node_modules/
 # Project data files (runtime artifacts)
 data/chat_history.txt
 data/mood_counter.txt
+
+.chroma

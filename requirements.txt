@@ -5,3 +5,8 @@ python-dotenv==1.0.1
 openai==1.51.0
 pydantic==2.9.0
 
+# RAG dependencies
+chromadb==0.5.5
+sentence-transformers==3.0.1
+pypdf==4.3.1
+
