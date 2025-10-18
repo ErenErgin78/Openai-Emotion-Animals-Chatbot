@@ -249,11 +249,9 @@
                 }
 
                 if (steps) {
-                    // Non-animal branch: highlight container edges
+                    // PLAIN (emotion) branch: green
                     try {
-                        const cont = document.querySelector('.container');
-                        cont && cont.classList.add('glow-green');
-                        setTimeout(() => cont && cont.classList.remove('glow-green'), 700);
+                        setActivePlainGlow();
                     } catch (_) {}
                     stepData = { steps, index: 0 };
                     // Show first (server-provided emoji preferred)
@@ -272,15 +270,10 @@
                     // second emoji cache for next step
                     window.__lastResponseSecondEmoji = data.second_emoji || null;
                 } else {
-                    // Plain text behavior
+                    // Plain text behavior (may be PLAIN path too)
                     addMessage(data.response, false);
                     if (data.first_emoji) {
-                        // Duygu sistemi: container'ı yeşil yap
-                        try {
-                            const cont = document.querySelector('.container');
-                            cont && cont.classList.add('glow-green');
-                            setTimeout(() => cont && cont.classList.remove('glow-green'), 700);
-                        } catch (_) {}
+                        try { setActivePlainGlow(); } catch (_) {}
                         
                         const node = document.getElementById('face-emoji');
                         if (node) {
@@ -357,26 +350,43 @@
         }
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeLightbox(); });
         // Wires + draggable nodes logic
+        function clearGlow() {
+            document.querySelectorAll('.func-node.active, .func-node.active-rag, .func-node.active-api, .func-node.active-plain').forEach(n => {
+                n.classList.remove('active','active-rag','active-api','active-plain');
+            });
+            document.querySelectorAll('.wire.glow, .wire.glow-rag, .wire.glow-api, .wire.glow-plain').forEach(n => {
+                n.classList.remove('glow','glow-rag','glow-api','glow-plain');
+            });
+        }
+
         function setActiveFunctionGlow(animal, type) {
+            // API branch → blue
             clearGlow();
             if (!animal) return;
             const id = `${animal}_${type === 'image' ? 'photo' : 'facts'}`;
             const node = document.getElementById('fn-' + id);
             const wire = document.getElementById('wire-' + id);
-            if (node) node.classList.add('active');
-            if (wire) wire.classList.add('glow');
+            if (node) node.classList.add('active-api');
+            if (wire) wire.classList.add('glow-api');
+            // highlight parent hub
+            const parent = document.getElementById('fn-parent-api');
+            if (parent) parent.classList.add('active-api');
+            const parentWire = document.getElementById('wire-parent-api');
+            if (parentWire) parentWire.classList.add('glow-api');
         }
-        function clearGlow() {
-            document.querySelectorAll('.func-node.active').forEach(n => n.classList.remove('active'));
-            document.querySelectorAll('.wire.glow').forEach(n => n.classList.remove('glow'));
-        }
+
         function setActivePdfGlow(pdfId, emoji) {
+            // RAG branch → yellow
             clearGlow();
             if (!pdfId) return;
             const node = document.getElementById('fn-' + pdfId);
             const wire = document.getElementById('wire-' + pdfId);
-            if (node) node.classList.add('active');
-            if (wire) wire.classList.add('glow');
+            if (node) node.classList.add('active-rag');
+            if (wire) wire.classList.add('glow-rag');
+            const parent = document.getElementById('fn-parent-rag');
+            if (parent) parent.classList.add('active-rag');
+            const parentWire = document.getElementById('wire-parent-rag');
+            if (parentWire) parentWire.classList.add('glow-rag');
             if (emoji) {
                 const face = document.getElementById('face-emoji');
                 if (face) {
@@ -384,6 +394,15 @@
                     setTimeout(() => { face.textContent = emoji; face.classList.remove('anim'); fitFaceEmoji(); }, 150);
                 }
             }
+        }
+
+        function setActivePlainGlow() {
+            // PLAIN branch → green; only nodes and wires glow
+            clearGlow();
+            const parent = document.getElementById('fn-parent-plain');
+            if (parent) parent.classList.add('active-plain');
+            const parentWire = document.getElementById('wire-parent-plain');
+            if (parentWire) parentWire.classList.add('glow-plain');
         }
 
         function handleRagResponse(data) {
@@ -408,17 +427,82 @@
         }
 
         const DRAGGABLES = [
-            { id: 'fn-dog_photo', side: 'left', prompt: 'Bana bir köpek fotoğrafı ver', top: 140, left: 16 },
-            { id: 'fn-dog_facts', side: 'left', prompt: 'Bana bir köpek bilgisi ver', top: 200, left: 16 },
-            { id: 'fn-cat_photo', side: 'left', prompt: 'Bana bir kedi fotoğrafı ver', top: 260, left: 16 },
-            { id: 'fn-cat_facts', side: 'right', prompt: 'Bana bir kedi bilgisi ver', top: 140, right: 16 },
-            { id: 'fn-fox_photo', side: 'right', prompt: 'Bana bir tilki fotoğrafı ver', top: 200, right: 16 },
-            { id: 'fn-duck_photo', side: 'right', prompt: 'Bana bir ördek fotoğrafı ver', top: 260, right: 16 },
-            // RAG PDF nodes
-            { id: 'fn-pdf-python', side: 'left', prompt: 'Python PDF bağlamıyla: Python nedir?', top: 320, left: 16 },
-            { id: 'fn-pdf-anayasa', side: 'right', prompt: 'Anayasa PDF bağlamıyla: Temel haklar nedir?', top: 320, right: 16 },
-            { id: 'fn-pdf-clean', side: 'right', prompt: 'Clean Architecture PDF bağlamıyla: Entities nedir?', top: 380, right: 16 },
+            // Parent hubs (no prompt except PLAIN)
+            { id: 'fn-parent-rag', side: 'left', top: 220, left: 160 },
+            { id: 'fn-parent-api', side: 'right', top: 220, right: 160 },
+            { id: 'fn-parent-plain', side: 'left', top: 120, left: 260, prompt: 'Bugün çok kötü hissediyorum :(' },
+            // API children (right side near API parent)
+            { id: 'fn-dog_photo', side: 'right', prompt: 'Bana bir köpek fotoğrafı ver', top: 120, right: 32 },
+            { id: 'fn-dog_facts', side: 'right', prompt: 'Bana bir köpek bilgisi ver', top: 180, right: 32 },
+            { id: 'fn-cat_photo', side: 'right', prompt: 'Bana bir kedi fotoğrafı ver', top: 240, right: 32 },
+            { id: 'fn-cat_facts', side: 'right', prompt: 'Bana bir kedi bilgisi ver', top: 300, right: 32 },
+            { id: 'fn-fox_photo', side: 'right', prompt: 'Bana bir tilki fotoğrafı ver', top: 360, right: 32 },
+            { id: 'fn-duck_photo', side: 'right', prompt: 'Bana bir ördek fotoğrafı ver', top: 420, right: 32 },
+            // RAG PDF nodes (left side near RAG parent)
+            { id: 'fn-pdf-python', side: 'left', prompt: 'Python PDF bağlamıyla: Python nedir?', top: 140, left: 32 },
+            { id: 'fn-pdf-anayasa', side: 'left', prompt: 'Anayasa PDF bağlamıyla: Temel haklar nedir?', top: 200, left: 32 },
+            { id: 'fn-pdf-clean', side: 'left', prompt: 'Clean Architecture PDF bağlamıyla: Entities nedir?', top: 260, left: 32 },
         ];
+
+        // Child→Parent grouping map (key without 'fn-')
+        const GROUP_PARENT = {
+            // API children → parent-api
+            'dog_photo': 'parent-api',
+            'dog_facts': 'parent-api',
+            'cat_photo': 'parent-api',
+            'cat_facts': 'parent-api',
+            'fox_photo': 'parent-api',
+            'duck_photo': 'parent-api',
+            // RAG children → parent-rag
+            'pdf-python': 'parent-rag',
+            'pdf-anayasa': 'parent-rag',
+            'pdf-clean': 'parent-rag',
+        };
+
+        // Collapsible UI state
+        const GROUPS = {
+            'parent-api': { open: false, children: ['dog_photo','dog_facts','cat_photo','cat_facts','fox_photo','duck_photo'] },
+            'parent-rag': { open: false, children: ['pdf-python','pdf-anayasa','pdf-clean'] },
+            'parent-plain': { open: false, children: [] },
+        };
+
+        function setCollapsedState(groupKey, open) {
+            const g = GROUPS[groupKey]; if (!g) return;
+            g.open = !!open;
+            const parentEl = document.getElementById('fn-' + groupKey);
+            // Toggle children visibility and positions near parent
+            g.children.forEach((childKey, idx) => {
+                const el = document.getElementById('fn-' + childKey);
+                const rope = document.getElementById('wire-' + childKey);
+                if (!el) return;
+                if (open) {
+                    el.classList.remove('collapsed');
+                    if (rope) rope.classList.remove('hidden');
+                    // spread around parent in a small arc
+                    try {
+                        const pr = parentEl.getBoundingClientRect();
+                        const angle = (-30 + (idx * (60 / Math.max(1, g.children.length - 1)))) * Math.PI / 180;
+                        const radius = 120;
+                        const targetLeft = (pr.left + pr.width / 2) + Math.cos(angle) * radius - el.offsetWidth / 2;
+                        const targetTop = (pr.top + pr.height / 2) + Math.sin(angle) * radius - el.offsetHeight / 2;
+                        el.style.left = Math.max(8, Math.min(window.innerWidth - el.offsetWidth - 8, targetLeft)) + 'px';
+                        el.style.top = Math.max(80, Math.min(window.innerHeight - el.offsetHeight - 8, targetTop)) + 'px';
+                    } catch (_) {}
+                } else {
+                    // move towards parent center and hide
+                    try {
+                        const pr = parentEl.getBoundingClientRect();
+                        const targetLeft = pr.left + pr.width / 2 - el.offsetWidth / 2;
+                        const targetTop = pr.top + pr.height / 2 - el.offsetHeight / 2;
+                        el.style.left = targetLeft + 'px';
+                        el.style.top = targetTop + 'px';
+                    } catch (_) {}
+                    el.classList.add('collapsed');
+                    if (rope) rope.classList.add('hidden');
+                }
+            });
+            updateRopesImmediate();
+        }
 
         // Rope with many segments (full rope)
         const ROPES = {}; // key → { points:[{x,y,vx,vy}], pathEl, side, restLen }
@@ -434,9 +518,25 @@
                 if (cfg.right !== undefined) el.style.right = cfg.right + 'px';
                 el.style.top = cfg.top + 'px';
                 el.dataset.side = cfg.side;
-                el.addEventListener('click', () => quickPrompt(cfg.prompt));
+                if (cfg.prompt) {
+                    el.addEventListener('click', () => quickPrompt(cfg.prompt));
+                }
+                // Toggle handler for parent hubs
+                if (cfg.id === 'fn-parent-api') {
+                    el.addEventListener('click', () => setCollapsedState('parent-api', !GROUPS['parent-api'].open));
+                }
+                if (cfg.id === 'fn-parent-rag') {
+                    el.addEventListener('click', () => setCollapsedState('parent-rag', !GROUPS['parent-rag'].open));
+                }
+                if (cfg.id === 'fn-parent-plain') {
+                    el.addEventListener('click', () => setCollapsedState('parent-plain', !GROUPS['parent-plain'].open));
+                }
                 makeDraggable(el);
             });
+            // Start collapsed: hide all children
+            setCollapsedState('parent-api', false);
+            setCollapsedState('parent-rag', false);
+            setCollapsedState('parent-plain', false);
             initRopes();
             updateRopesImmediate();
             requestAnimationFrame(stepRopes);
@@ -511,6 +611,18 @@
             const cRect = container.getBoundingClientRect();
             const nRect = node.getBoundingClientRect();
             const cfg = DRAGGABLES.find(c => c.id === 'fn-' + key) || { side: 'left', anchorRatio: 0.5 };
+            // If this node has a parent hub, end at parent center instead of container edge
+            const parentKey = GROUP_PARENT[key];
+            if (parentKey) {
+                const parentEl = document.getElementById('fn-' + parentKey);
+                const pRect = parentEl.getBoundingClientRect();
+                return {
+                    startX: nRect.left + nRect.width / 2,
+                    startY: nRect.top + nRect.height / 2,
+                    endX: pRect.left + pRect.width / 2,
+                    endY: pRect.top + pRect.height / 2,
+                };
+            }
             const anchorY = Math.min(Math.max(cRect.top + (cfg.anchorRatio || 0.5) * cRect.height, cRect.top + 24), cRect.bottom - 24);
             return {
                 startX: nRect.left + nRect.width / 2,
@@ -563,12 +675,10 @@
                         else { a.x += dx * diff * 0.5; a.y += dy * diff * 0.5; b.x -= dx * diff * 0.5; b.y -= dy * diff * 0.5; }
                     }
                 }
-                // Anchor (container tarafı) sabit: p[SEGMENTS] container kenarının tam üstünde kalsın
-                const cRect = document.querySelector('.container').getBoundingClientRect();
+                // Anchor hedefi: ep.endX/endY (çocuklar için parent merkezi, parent için container kenarı)
                 const anchor = pts[SEGMENTS];
-                const cfg = DRAGGABLES.find(c => c.id === 'fn-' + key) || { side: 'left', anchorRatio: 0.5 };
-                if (cfg.side === 'left') { anchor.x = cRect.left; } else { anchor.x = cRect.right; }
-                anchor.y = Math.min(Math.max(cRect.top + (cfg.anchorRatio || 0.5) * cRect.height, cRect.top + 24), cRect.bottom - 24);
+                anchor.x = ep.endX;
+                anchor.y = ep.endY;
                 drawRope(key);
             }
             requestAnimationFrame(stepRopes);
