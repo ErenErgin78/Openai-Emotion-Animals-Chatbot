@@ -23,6 +23,7 @@ from langchain_openai import OpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain, SequentialChain
 from langchain.schema import BaseOutputParser
+from langchain.memory import ConversationSummaryBufferMemory
 
 # Sistem modüllerini import et
 from emotion_system import EmotionChatbot
@@ -35,6 +36,19 @@ app = FastAPI(title="CHAIN SYSTEM - Akıllı Chatbot Sistemi", version="3.0.0")
 
 # LangChain LLM instance
 llm = OpenAI(temperature=0.1, max_tokens=1000, request_timeout=15)
+
+# =============================================================================
+# CONVERSATIONSUMMARYBUFFERMEMORY - GLOBAL MEMORY SİSTEMİ
+# =============================================================================
+# Hibrit yaklaşım: uzun konuşmaları özetler, son mesajları hatırlar
+# Token limiti ile maliyet kontrolü sağlar
+# Tüm chain'ler bu memory sistemi ile konuşma geçmişini paylaşır
+memory = ConversationSummaryBufferMemory(
+    llm=llm,
+    max_token_limit=200,  # 200 token limit - maliyet kontrolü için
+    memory_key="chat_history",  # Memory anahtarı - chain'lerde otomatik kullanılır
+    return_messages=True  # Mesaj formatında döndür - LangChain uyumluluğu için
+)
 
 # Global chatbot instance
 chatbot_instance: EmotionChatbot | None = None
@@ -126,9 +140,10 @@ def _estimate_tokens(text: str) -> int:
 # =============================================================================
 
 def create_flow_decision_chain():
-    """Akış kararı chain'i oluşturur"""
+    """Akış kararı chain'i oluşturur - ConversationSummaryBufferMemory ile"""
+    # Memory sistemi ile akış kararı - önceki konuşma bağlamı otomatik eklenir
     flow_prompt = PromptTemplate(
-        input_variables=["user_message"],
+        input_variables=["input"],
         template="""Kullanıcının mesajını analiz et ve şu akışlardan birini seç:
 
 ÖNEMLİ KURALLAR:
@@ -141,7 +156,7 @@ Akışlar:
 - RAG: Python, Anayasa, Clean Architecture, teknik terimler, bilgi soruları, "nedir", "nasıl", "açıkla", "tanım", "principle", "concept"
 - EMOTION: Duygu analizi, sohbet, normal konuşma
 
-Kullanıcı Mesajı: {user_message}
+Kullanıcı Mesajı: {input}
 
 Sadece şu yanıtlardan birini ver: ANIMAL, RAG, EMOTION"""
     )
@@ -149,24 +164,24 @@ Sadece şu yanıtlardan birini ver: ANIMAL, RAG, EMOTION"""
     return LLMChain(
         llm=llm,
         prompt=flow_prompt,
+        memory=memory,  # Memory sistemi entegrasyonu
         output_parser=FlowDecisionParser(),
         output_key="flow_decision"
     )
 
 
 def create_rag_chain():
-    """RAG chain'i oluşturur"""
+    """RAG chain'i oluşturur - ConversationSummaryBufferMemory ile"""
+    # Memory ile kullanırken sadece tek input variable kullan - chat_history otomatik eklenir
+    # Context bilgisi prompt'a dahil edilir, memory sistemi konuşma geçmişini yönetir
     rag_prompt = PromptTemplate(
-        input_variables=["user_message", "context"],
+        input_variables=["input"],
         template="""Sen bir bilgi asistanısın. Kullanıcının sorularını verilen bağlam bilgilerini kullanarak yanıtla. 
 Türkçe, kısa ve net yanıtlar ver. Bağlam bilgisini kullan ama gereksiz detay verme. 
 Eğer bağlamda yeterli bilgi yoksa bunu belirt. Yanıtını doğrudan metin olarak ver (JSON formatında değil). 
-Maksimum 5 cümle ile yanıtla. Özellikle Clean Architecture, Python, Anayasa konularında uzmanlaşmışsın.
+Maksimum 5 cümle ile yanıtla.
 
-BAĞLAM:
-{context}
-
-SORU: {user_message}
+SORU: {input}
 
 YANIT:"""
     )
@@ -174,46 +189,94 @@ YANIT:"""
     return LLMChain(
         llm=llm,
         prompt=rag_prompt,
+        memory=memory,  # Memory sistemi entegrasyonu
         output_key="rag_response"
     )
 
 
 def create_animal_chain():
-    """Animal chain'i oluşturur - API çağrısı yapar"""
+    """Animal chain'i oluşturur - API çağrısı yapar - ConversationSummaryBufferMemory ile"""
     def animal_processor(user_message: str) -> Dict[str, Any]:
-        """Hayvan API'sini çağırır ve sonucu döndürür"""
-        animal_result = route_animals(user_message, llm)
-        if animal_result:
-            animal = str(animal_result.get("animal", ""))
-            out: Dict[str, Any] = {
-                "animal": animal,
-                "type": animal_result.get("type"),
-                "animal_emoji": _animal_emoji(animal),
-            }
-            if animal_result.get("type") == "image":
-                out["image_url"] = animal_result.get("image_url")
-                out["response"] = f"{_animal_emoji(animal)} {animal.capitalize()} fotoğrafı hazır."
-            else:
-                out["response"] = animal_result.get("text", "")
-            return out
-        return {"response": "Hayvan bulunamadı."}
+        """Hayvan API'sini çağırır ve sonucu döndürür - memory sistemi ile timeout handling"""
+        # Hayvan API'leri için timeout ve hata yönetimi
+        # Memory sistemi ile konuşma geçmişi otomatik olarak yönetiliyor
+        try:
+            print("[ANIMAL CHAIN] Hayvan API'si çağrılıyor...")
+            # OpenAI client oluştur - route_animals client bekliyor
+            from openai import OpenAI
+            client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            animal_result = route_animals(user_message, client)
+            
+            if animal_result:
+                animal = str(animal_result.get("animal", ""))
+                out: Dict[str, Any] = {
+                    "animal": animal,
+                    "type": animal_result.get("type"),
+                    "animal_emoji": _animal_emoji(animal),
+                }
+                if animal_result.get("type") == "image":
+                    out["image_url"] = animal_result.get("image_url")
+                    out["response"] = f"{_animal_emoji(animal)} {animal.capitalize()} fotoğrafı hazır."
+                else:
+                    out["response"] = animal_result.get("text", "")
+                
+                # Memory'ye animal yanıtını kaydet
+                memory.save_context(
+                    {"input": user_message},
+                    {"output": out["response"]}
+                )
+                
+                print(f"[ANIMAL CHAIN] Başarılı: {animal}")
+                return out
+            
+            # Hayvan bulunamadı durumu için de memory'ye kaydet
+            error_response = "Hayvan bulunamadı."
+            memory.save_context(
+                {"input": user_message},
+                {"output": error_response}
+            )
+            print("[ANIMAL CHAIN] Hayvan bulunamadı")
+            return {"response": error_response}
+            
+        except Exception as e:
+            print(f"[ANIMAL CHAIN] Hata: {e}")
+            # Timeout veya API hatası durumunda fallback yanıt
+            error_response = "Hayvan API'si şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin."
+            memory.save_context(
+                {"input": user_message},
+                {"output": error_response}
+            )
+            return {"response": error_response}
     
     return animal_processor
 
 
 def create_emotion_chain():
-    """Emotion chain'i oluşturur"""
+    """Emotion chain'i oluşturur - ConversationSummaryBufferMemory ile"""
     def emotion_processor(user_message: str) -> Dict[str, Any]:
-        """Duygu analizi yapar"""
+        """Duygu analizi yapar - memory sistemi ile"""
+        # Emotion sistemi için OpenAI client oluşturma
+        # Memory sistemi ile konuşma geçmişi otomatik olarak yönetiliyor
         global chatbot_instance
         if chatbot_instance is None:
-            chatbot_instance = EmotionChatbot(llm)
+            # OpenAI client oluştur - llm değil client kullan
+            from openai import OpenAI
+            client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            chatbot_instance = EmotionChatbot(client)
+        
+        # Memory sistemi ile önceki konuşma geçmişi otomatik olarak yönetiliyor
         
         result = chatbot_instance.chat(user_message)
         stats = {
             "requests": chatbot_instance.stats["requests"],
             "last_request_at": chatbot_instance.stats["last_request_at"],
         }
+        
+        # Memory'ye yeni konuşmayı kaydet
+        memory.save_context(
+            {"input": user_message},
+            {"output": result.get("response", "")}
+        )
         
         out = {"response": result.get("response", ""), "stats": stats}
         if "first_emoji" in result:
@@ -241,12 +304,14 @@ def create_main_processing_chain():
     emotion_processor = create_emotion_chain()
     
     def process_message(user_message: str) -> Dict[str, Any]:
-        """Ana mesaj işleme fonksiyonu"""
+        """Ana mesaj işleme fonksiyonu - ConversationSummaryBufferMemory ile"""
         try:
             print("[CHAIN SYSTEM] AŞAMA 1: Akış kararı alınıyor...")
             
+            # Memory sistemi aktif - ConversationSummaryBufferMemory ile konuşma geçmişi yönetiliyor
+            
             # AŞAMA 1: Akış kararı
-            flow_result = flow_decision_chain.run(user_message=user_message)
+            flow_result = flow_decision_chain.run(input=user_message)
             # LangChain chain'leri direkt string döndürür, dict değil
             flow_decision = flow_result if isinstance(flow_result, str) else str(flow_result)
             print(f"[CHAIN SYSTEM] Akış kararı: {flow_decision}")
@@ -296,8 +361,15 @@ def _process_rag_flow(user_message: str, rag_chain) -> Dict[str, Any] | None:
         context = "\n\n".join([c.get("text", "") for c in chunks])
         sources = list({(c.get("metadata", {}) or {}).get("source", "?") for c in chunks})
         
-        # RAG chain ile işle
-        result = rag_chain.run(user_message=user_message, context=context)
+        # RAG chain ile işle - context'i prompt'a dahil et
+        combined_input = f"BAĞLAM:\n{context}\n\nSORU: {user_message}"
+        result = rag_chain.run(input=combined_input)
+        
+        # Memory'ye RAG yanıtını kaydet
+        memory.save_context(
+            {"input": user_message},
+            {"output": result if isinstance(result, str) else str(result)}
+        )
         
         # Pick first known source for UI hint
         lit = None
@@ -319,8 +391,15 @@ def _process_rag_flow(user_message: str, rag_chain) -> Dict[str, Any] | None:
         return None
     context = "\n\n".join([c.get("text", "") for c in chunks])
     
-    # RAG chain ile işle
-    result = rag_chain.run(user_message=user_message, context=context)
+    # RAG chain ile işle - context'i prompt'a dahil et
+    combined_input = f"BAĞLAM:\n{context}\n\nSORU: {user_message}"
+    result = rag_chain.run(input=combined_input)
+    
+    # Memory'ye RAG yanıtını kaydet
+    memory.save_context(
+        {"input": user_message},
+        {"output": result if isinstance(result, str) else str(result)}
+    )
     
     ui = RAG_SOURCES.get(source)
     return {

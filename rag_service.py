@@ -78,7 +78,10 @@ COLLECTION_NAME = "project_pdfs"
 
 
 class RagService:
+    """RAG servisi - PDF'lerden bilgi çekme ve vektör arama"""
     def __init__(self) -> None:
+        # ChromaDB persistent client ile vektör veritabanı yönetimi
+        # Memory sistemi ana sistem tarafından ConversationSummaryBufferMemory ile yönetiliyor
         self._client: Optional[chromadb.Client] = None
         self._collection = None
         self._embedder = None

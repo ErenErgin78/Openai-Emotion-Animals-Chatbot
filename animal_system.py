@@ -207,6 +207,8 @@ def _animal_keyword_router(text: str) -> dict | None:
 
 def route_animals(user_message: str, client) -> dict | None:
     """Ana hayvan yönlendirme fonksiyonu - function calling + fallback"""
+    # OpenAI client ile function calling yaparak hayvan API'lerini çağırır
+    # Memory sistemi ana sistem tarafından ConversationSummaryBufferMemory ile yönetiliyor
     # Güvenlik kontrolleri
     if not user_message:
         return None

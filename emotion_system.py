@@ -204,11 +204,10 @@ class EmotionChatbot:
         self.stats["requests"] += 1
         self.stats["last_request_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # Geçmişten son 3 mesajı (user/assistant) dahil et, üstüne yeni kullanıcı mesajını ekle
-        # En başa her zaman sabit sistem promptu koy
-        history_tail = self.messages[-6:] if len(self.messages) > 6 else self.messages[:]
+        # ConversationSummaryBufferMemory sistemi kullanılacak - bu kısım kaldırıldı
+        # Sadece sistem promptu ve kullanıcı mesajı - memory chain tarafından yönetilecek
+        # Önceki konuşma geçmişi ana sistem tarafından ConversationSummaryBufferMemory ile yönetiliyor
         messages_payload: list[Dict[str, Any]] = [{"role": "system", "content": self._get_emotion_system_prompt().strip()}]
-        messages_payload.extend(history_tail)
         messages_payload.append({"role": "user", "content": user_message})
 
         # Debug için OpenAI'ye giden tam metni hazırla

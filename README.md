@@ -28,6 +28,13 @@ LLM, kullanıcının mesajından hangi akışın çalışacağını akıllıca s
 - **Error Handling**: Chain hatalarında güvenli fallback
 - **Security Patterns**: Injection saldırılarına karşı koruma
 
+### 🧠 ConversationSummaryBufferMemory Sistemi
+- **Hibrit Yaklaşım**: Uzun konuşmaları özetler, son mesajları hatırlar
+- **Token Kontrolü**: 200 token limit ile maliyet optimizasyonu
+- **Global Memory**: Tüm chain'ler aynı memory instance'ını paylaşır
+- **Otomatik Yönetim**: Konuşma geçmişi otomatik olarak yönetiliyor
+- **Context Preservation**: Önceki konuşmaların bağlamı korunuyor
+
 ---
 
 ## 🚀 Özellikler
