@@ -7,6 +7,29 @@ Bu proje **üç ana akışı** birleştiren gelişmiş bir chatbot sistemidir:
 
 LLM, kullanıcının mesajından hangi akışın çalışacağını akıllıca seçer ve ilgili sistemi devreye sokar.
 
+## 🔗 CHAIN SYSTEM - LangChain Entegrasyonu
+
+### ⚡ Chain-Based Mimari
+- **LangChain Framework**: Tüm sistem LangChain chain yapısı ile yönetilir
+- **Akış Yönlendirme Chain'i**: LLM ile otomatik akış seçimi (RAG/ANIMAL/EMOTION)
+- **Modüler Chain'ler**: Her sistem ayrı chain olarak çalışır
+- **Output Parser**: Akış kararlarını temizler ve doğrular
+- **Sequential Processing**: Sıralı işlem zinciri ile güvenli yönlendirme
+
+### 🔄 Chain İş Akışı
+1. **Flow Decision Chain**: Kullanıcı mesajını analiz eder, akış seçer
+2. **RAG Chain**: PDF içeriği + kullanıcı sorusu → bilgi yanıtı
+3. **Animal Chain**: Hayvan API çağrısı ve sonuç işleme
+4. **Emotion Chain**: Duygu analizi ve iki aşamalı yanıt
+
+### 🛡️ Chain Güvenliği
+- **Input Sanitization**: Tüm girişler temizlenir
+- **Token Limiti**: Maksimum token kontrolü
+- **Error Handling**: Chain hatalarında güvenli fallback
+- **Security Patterns**: Injection saldırılarına karşı koruma
+
+---
+
 ## 🚀 Özellikler
 
 ### 🧠 RAG (Retrieval-Augmented Generation) Sistemi

@@ -73,3 +73,5 @@ data/chat_history.txt
 data/mood_counter.txt
 
 .chroma
+Example/*
+.cursor/
