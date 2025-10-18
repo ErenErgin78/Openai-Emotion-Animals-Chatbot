@@ -211,10 +211,14 @@ Tarayıcınızda: `http://localhost:8000/`
 
 #### static/app.js
 - **Chat Akışı**: İstek gönderme (`/chat`), durum/emoji güncellemeleri
-- **RAG Yanıtı**: `handleRagResponse` ile tek seferde 5 cümleyi sınırlar; `setActivePdfGlow` ile PDF düğümü/halatı yeşil parlar
+- **RAG Yanıtı**: `handleRagResponse` ile tek seferde 5 cümleyi sınırlar; `setActivePdfGlow` ile PDF düğümü/halatı sarı parlar
 - **Hayvan Yanıtı**: Görsel/text mesaj, ilgili düğümün parlaması ve ışın efekti
-- **Duygu Yanıtı**: İki aşamalı mod (Next butonu), `container` kenarı yeşil `glow-green` efekti
+- **Duygu Yanıtı**: İki aşamalı mod (Next butonu); PLAIN yolunda sadece node ve ip’ler yeşil parlar
 - **Draggable Düğümler**: Fonksiyon düğümleri, halat fiziği (SVG path), Matrix arkaplan, tema (dark/light)
+- **Node Hiyerarşisi (Yeni)**: RAG/API/PLAIN büyük node’leri ve onlara bağlı küçük node’ler. Başlangıçta küçük node’ler gizli (collapsed); büyük node’e tıklayınca çocuklar tarafına göre bir yay şeklinde dışarı açılır, tekrar tıklayınca merkeze akıp kaybolur. Sürüklerken açılmaz (drag ile click ayrıştırıldı) ve drag sırasında transition devre dışı olduğundan tepki anlıktır.
+- **Tek Hat Tasarımı (Yeni)**: Chat ←→ (tek ip) ←→ Büyük Node ←→ (çoklu ip) ←→ Küçük Node’ler.
+- **Otomatik Açılma (Yeni)**: Kapalıyken bir küçük node prompt ile tetiklenirse ilgili büyük node grubu otomatik açılır.
+- **Renkler (Yeni)**: RAG sarı, API mavi, PLAIN yeşil; yalnızca node ve ip’ler parlar.
 
 #### static/app.css
 - **Tema Değişkenleri**: Light/dark, `glow-green` efekti, düğüm/halat stilleri, chat mesajları, lightbox
@@ -246,6 +250,15 @@ Tarayıcınızda: `http://localhost:8000/`
 - **Işın Animasyonu**: Düğümden chat kutusuna
 - **Emoji Değişimi**: Yüz alanında dinamik emoji
 - **Matrix Efekti**: Arka plan animasyonu
+
+#### Node Hiyerarşisi ve Aç/Kapa (Yeni)
+- **Büyük Node’ler**: RAG, API, PLAIN (boyut artırıldı)
+- **Küçük Node’ler**: Başlangıçta kapalı; tıklayınca açılır ve tarafına göre (sağda→sağa, solda→sola) yayılan bir yay üzerinde konumlanır
+- **Tek Hat**: Büyük node ile chat arasında tek ip; küçük node’ler büyük node’e bağlanır
+- **Renkli Parlama**: RAG=sarı, API=mavi, PLAIN=yeşil; yalnızca node ve ip’ler yanar
+- **Drag Davranışı**: Sürüklerken açılma tetiklenmez; drag sırasında transition kapalıdır → gecikmesiz hareket
+- **PLAIN Kısayol**: PLAIN node’üne tıklayınca input “Bugün çok kötü hissediyorum :(” ile doldurulur
+- **Küçük Etiketler**: RAG çocuk etiketlerinden “PDF -” kaldırıldı (ör. “Python”, “Anayasa”, “Clean Arch”)
 
 ### Etkileşim
 - **Sürükle-Bırak**: Düğümleri hareket ettirme

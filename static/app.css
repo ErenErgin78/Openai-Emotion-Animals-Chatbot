@@ -35,6 +35,7 @@ body { font-family: Arial, sans-serif; margin: 20px; background: var(--bg); colo
 /* Side draggable nodes & SVG wires */
 .wires { position: fixed; inset: 0; pointer-events: none; z-index: 1; }
 .func-node { position: fixed; z-index: 2; pointer-events: auto; background: var(--bubble-bg); color: var(--text); border: 1px solid var(--border); border-radius: 16px; padding: 14px 18px; font-size: 16px; cursor: grab; box-shadow: 0 3px 12px rgba(0,0,0,0.18); user-select: none; transition: top 220ms ease, left 220ms ease, right 220ms ease, opacity 220ms ease; }
+.func-node.dragging { transition: none !important; }
 .func-node:active { cursor: grabbing; }
 .func-node:hover { filter: brightness(1.05); }
 .func-node#fn-parent-rag, .func-node#fn-parent-api, .func-node#fn-parent-plain { padding: 18px 22px; font-size: 18px; border-radius: 18px; }

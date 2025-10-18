@@ -373,6 +373,8 @@
             if (parent) parent.classList.add('active-api');
             const parentWire = document.getElementById('wire-parent-api');
             if (parentWire) parentWire.classList.add('glow-api');
+            // Ensure API group is open if triggered via prompt
+            if (!GROUPS['parent-api'].open) setCollapsedState('parent-api', true);
         }
 
         function setActivePdfGlow(pdfId, emoji) {
@@ -387,6 +389,8 @@
             if (parent) parent.classList.add('active-rag');
             const parentWire = document.getElementById('wire-parent-rag');
             if (parentWire) parentWire.classList.add('glow-rag');
+            // Ensure RAG group is open if triggered via prompt
+            if (!GROUPS['parent-rag'].open) setCollapsedState('parent-rag', true);
             if (emoji) {
                 const face = document.getElementById('face-emoji');
                 if (face) {
@@ -403,6 +407,7 @@
             if (parent) parent.classList.add('active-plain');
             const parentWire = document.getElementById('wire-parent-plain');
             if (parentWire) parentWire.classList.add('glow-plain');
+            if (!GROUPS['parent-plain'].open) setCollapsedState('parent-plain', true);
         }
 
         function handleRagResponse(data) {
@@ -481,11 +486,17 @@
                     // spread around parent in a small arc
                     try {
                         const pr = parentEl.getBoundingClientRect();
-                        const angle = (-30 + (idx * (60 / Math.max(1, g.children.length - 1)))) * Math.PI / 180;
-                        const radius = 120;
+                        const isRight = (el.dataset.side === 'right');
+                        const count = Math.max(1, g.children.length);
+                        const span = 80; // wider span to avoid overlap
+                        const base = isRight ? (-span/2) : (180 + -span/2);
+                        const angleStep = (count === 1) ? 0 : (span / (count - 1));
+                        const angle = (base + idx * angleStep) * Math.PI / 180;
+                        const radius = 140 + (idx % 2) * 16; // slight stagger
                         const targetLeft = (pr.left + pr.width / 2) + Math.cos(angle) * radius - el.offsetWidth / 2;
                         const targetTop = (pr.top + pr.height / 2) + Math.sin(angle) * radius - el.offsetHeight / 2;
                         el.style.left = Math.max(8, Math.min(window.innerWidth - el.offsetWidth - 8, targetLeft)) + 'px';
+                        el.style.right = 'auto';
                         el.style.top = Math.max(80, Math.min(window.innerHeight - el.offsetHeight - 8, targetTop)) + 'px';
                     } catch (_) {}
                 } else {
@@ -495,6 +506,7 @@
                         const targetLeft = pr.left + pr.width / 2 - el.offsetWidth / 2;
                         const targetTop = pr.top + pr.height / 2 - el.offsetHeight / 2;
                         el.style.left = targetLeft + 'px';
+                        el.style.right = 'auto';
                         el.style.top = targetTop + 'px';
                     } catch (_) {}
                     el.classList.add('collapsed');
@@ -507,7 +519,7 @@
         // Rope with many segments (full rope)
         const ROPES = {}; // key → { points:[{x,y,vx,vy}], pathEl, side, restLen }
         const SEGMENTS = 12; // daha pürüzsüz halat
-        const DAMPING = 0.965; // daha yüksek sürtünme, ani fırlamayı azalt
+        const DAMPING = 0.988; // daha düşük sürtünme, daha akıcı sürükleme
         const CONSTRAINT_ITERS = 3;
 
         function initDraggables() {
@@ -519,17 +531,17 @@
                 el.style.top = cfg.top + 'px';
                 el.dataset.side = cfg.side;
                 if (cfg.prompt) {
-                    el.addEventListener('click', () => quickPrompt(cfg.prompt));
+                el.addEventListener('click', () => quickPrompt(cfg.prompt));
                 }
                 // Toggle handler for parent hubs
                 if (cfg.id === 'fn-parent-api') {
-                    el.addEventListener('click', () => setCollapsedState('parent-api', !GROUPS['parent-api'].open));
+                    el.addEventListener('click', () => { if (el.dataset.dragMoved !== 'true') setCollapsedState('parent-api', !GROUPS['parent-api'].open); });
                 }
                 if (cfg.id === 'fn-parent-rag') {
-                    el.addEventListener('click', () => setCollapsedState('parent-rag', !GROUPS['parent-rag'].open));
+                    el.addEventListener('click', () => { if (el.dataset.dragMoved !== 'true') setCollapsedState('parent-rag', !GROUPS['parent-rag'].open); });
                 }
                 if (cfg.id === 'fn-parent-plain') {
-                    el.addEventListener('click', () => setCollapsedState('parent-plain', !GROUPS['parent-plain'].open));
+                    el.addEventListener('click', () => { if (el.dataset.dragMoved !== 'true') setCollapsedState('parent-plain', !GROUPS['parent-plain'].open); });
                 }
                 makeDraggable(el);
             });
@@ -543,18 +555,20 @@
         }
 
         function makeDraggable(node) {
-            let dragging = false; let startX = 0; let startY = 0; let startLeft = 0; let startTop = 0; let lastVX = 0; let lastVY = 0; let lastTs = 0; let prevLeft = 0; let prevTop = 0;
+            let dragging = false; let startX = 0; let startY = 0; let startLeft = 0; let startTop = 0; let lastVX = 0; let lastVY = 0; let lastTs = 0; let prevLeft = 0; let prevTop = 0; let moved = false;
             node.addEventListener('pointerdown', (e) => {
                 dragging = true; node.setPointerCapture(e.pointerId);
-                startX = e.clientX; startY = e.clientY; lastVX = 0; lastVY = 0; lastTs = performance.now();
+                startX = e.clientX; startY = e.clientY; lastVX = 0; lastVY = 0; lastTs = performance.now(); moved = false; node.dataset.dragMoved = 'false';
                 const rect = node.getBoundingClientRect();
                 startLeft = rect.left; startTop = rect.top; prevLeft = rect.left; prevTop = rect.top;
+                node.classList.add('dragging');
             });
             node.addEventListener('pointermove', (e) => {
                 if (!dragging) return;
                 const now = performance.now();
                 const dt = Math.max(0.016, (now - lastTs) / 1000);
                 const dx = e.clientX - startX; const dy = e.clientY - startY;
+                if (!moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) { moved = true; node.dataset.dragMoved = 'true'; }
                 let newLeft = Math.max(8, Math.min(window.innerWidth - node.offsetWidth - 8, startLeft + dx));
                 const newTop = Math.max(80, Math.min(window.innerHeight - node.offsetHeight - 8, startTop + dy));
                 // Side constraint: keep node on its side of the container
@@ -577,8 +591,8 @@
                 prevLeft = newLeft; prevTop = newTop; lastTs = now;
                 updateRopesImmediate();
             });
-            node.addEventListener('pointerup', () => { dragging = false; impartVelocity(node, lastVX, lastVY); lastVX = 0; lastVY = 0; });
-            node.addEventListener('pointercancel', () => { dragging = false; });
+            node.addEventListener('pointerup', () => { dragging = false; impartVelocity(node, lastVX, lastVY); lastVX = 0; lastVY = 0; node.classList.remove('dragging'); setTimeout(() => { node.dataset.dragMoved = 'false'; }, 0); });
+            node.addEventListener('pointercancel', () => { dragging = false; node.classList.remove('dragging'); });
         }
 
         function initRopes() {
@@ -587,6 +601,17 @@
             if (!svg || !container) return;
             svg.setAttribute('width', window.innerWidth);
             svg.setAttribute('height', window.innerHeight);
+            // Ensure parent wires exist (parent→chat)
+            ['parent-api','parent-rag','parent-plain'].forEach(pk => {
+                let pw = document.getElementById('wire-' + pk);
+                if (!pw) {
+                    pw = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    pw.setAttribute('id', 'wire-' + pk);
+                    pw.setAttribute('class', 'wire');
+                    svg.appendChild(pw);
+                }
+                ROPES[pk] = ROPES[pk] || { points: [], pathEl: pw, side: (pk==='parent-api'?'right':'left'), restLen: 0 };
+            });
             DRAGGABLES.forEach(cfg => {
                 const key = cfg.id.replace('fn-','');
                 let path = document.getElementById('wire-' + key);
@@ -601,13 +626,13 @@
                 const cRect = container.getBoundingClientRect();
                 const ratio = Math.min(0.95, Math.max(0.05, (nRect.top + nRect.height / 2 - cRect.top) / Math.max(1, cRect.height)));
                 cfg.anchorRatio = ratio;
-                ROPES[key] = { points: [], pathEl: path, side: cfg.side, restLen: 0 };
+                ROPES[key] = ROPES[key] || { points: [], pathEl: path, side: cfg.side, restLen: 0 };
             });
         }
 
         function ropeEndpoints(key) {
             const container = document.querySelector('.container');
-            const node = document.getElementById('fn-' + key);
+            const node = document.getElementById('fn-' + key) || document.getElementById('fn-parent-' + key.split('parent-')[1]);
             const cRect = container.getBoundingClientRect();
             const nRect = node.getBoundingClientRect();
             const cfg = DRAGGABLES.find(c => c.id === 'fn-' + key) || { side: 'left', anchorRatio: 0.5 };
@@ -621,6 +646,17 @@
                     startY: nRect.top + nRect.height / 2,
                     endX: pRect.left + pRect.width / 2,
                     endY: pRect.top + pRect.height / 2,
+                };
+            }
+            // Parent wires go to container edge
+            if (key === 'parent-api' || key === 'parent-rag' || key === 'parent-plain') {
+                const anchorY = Math.min(Math.max(cRect.top + 0.5 * cRect.height, cRect.top + 24), cRect.bottom - 24);
+                const side = (key === 'parent-api') ? 'right' : 'left';
+                return {
+                    startX: nRect.left + nRect.width / 2,
+                    startY: nRect.top + nRect.height / 2,
+                    endX: (side === 'left') ? cRect.left : cRect.right,
+                    endY: anchorY
                 };
             }
             const anchorY = Math.min(Math.max(cRect.top + (cfg.anchorRatio || 0.5) * cRect.height, cRect.top + 24), cRect.bottom - 24);
@@ -708,7 +744,7 @@
             const rope = ROPES[key]; if (!rope) return;
             if (!isFinite(vx) || !isFinite(vy)) { vx = 0; vy = 0; }
             let speed = Math.hypot(vx, vy);
-            if (speed > 800) { const s = 800 / Math.max(1e-6, speed); vx *= s; vy *= s; }
+            if (speed > 1200) { const s = 1200 / Math.max(1e-6, speed); vx *= s; vy *= s; }
             const n = rope.points.length;
             for (let i = 1; i < n - 1; i++) {
                 const falloff = 1 - (i / (n - 1)); // uca yakın daha fazla pay
@@ -717,8 +753,8 @@
             }
             // Her çekmede halat biraz kısalsın (minimum sınır ile)
             const ep = ropeEndpoints(key);
-            const minLen = Math.max(8, Math.hypot(ep.endX - ep.startX, ep.endY - ep.startY) / SEGMENTS * 0.6);
-            rope.restLen = Math.max(minLen, (rope.restLen || minLen) * 0.98);
+            const minLen = Math.max(8, Math.hypot(ep.endX - ep.startX, ep.endY - ep.startY) / SEGMENTS * 0.9);
+            rope.restLen = Math.max(minLen, (rope.restLen || minLen) * 0.995);
         }
 
         function recomputeRestLenAll() {
