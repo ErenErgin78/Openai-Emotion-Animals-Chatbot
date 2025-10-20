@@ -46,10 +46,11 @@ Bu proje, **Kairu LLM eğitiminin tüm haftalarını** birleştiren kapsamlı bi
 
 ## 🏗️ Proje Mimarisi
 
-### 🎯 **Üç Ana Akış Sistemi**
+### 🎯 **Dört Ana Akış Sistemi**
 1. **🧠 RAG Sistemi**: PDF'lerden bilgi çekme ve akıllı yanıt üretimi
 2. **🐶 Hayvan Sistemi**: 7 farklı API ile hayvan fotoğraf ve bilgi servisi
 3. **💭 Duygu Analizi**: 10 duygu tespiti ve iki aşamalı yanıt sistemi
+4. **📊 İstatistik Sistemi**: Duygu verilerini analiz eden ayrı akış
 
 ### 🧠 **Memory Yönetimi**
 - **ConversationSummaryBufferMemory**: Hibrit yaklaşım
@@ -76,8 +77,14 @@ Bu proje, **Kairu LLM eğitiminin tüm haftalarını** birleştiren kapsamlı bi
 ### 💭 **Duygu Analizi**
 - 10 farklı duygu tespiti
 - İki aşamalı yanıt sistemi
-- Emoji desteği ve istatistik takibi
+- Emoji desteği
 - Kalıcı veri depolama
+
+### 📊 **İstatistik Sistemi**
+- Duygu verilerini analiz eder
+- Bugün/tüm zamanlar filtreleme
+- Belirli duygu istatistikleri
+- data/ klasöründen otomatik veri okuma
 
 ### 🎨 **Gelişmiş UI/UX**
 - Sürüklenebilir düğümler ve halat animasyonları
@@ -139,7 +146,11 @@ Tarayıcınızda: `http://localhost:8000/`
 ### Duygu Sistemi
 - **"bugün köpeğim öldü :("** → Üzgün emoji + container yeşil glow
 - **"merhaba nasılsın?"** → Mutlu emoji + sohbet
-- **"Bugün en çok hangi duyguyu yaşadım?"** → İstatistik raporu
+
+### İstatistik Sistemi
+- **"Bugün kaç kere mutlu oldum?"** → Bugünkü mutluluk sayısı
+- **"En çok hangi duyguyu yaşadım?"** → Tüm zamanlar duygu özeti
+- **"Üzgün duygu istatistikleri"** → Sadece üzgün duygu analizi
 
 ---
 
@@ -159,8 +170,13 @@ Tarayıcınızda: `http://localhost:8000/`
 ### Duygu Sistemi
 - **JSON Format**: İlk/ikinci duygu + cevap
 - **Emoji Seçimi**: Rastgele seçim
-- **İstatistik**: Günlük/toplam sayaçlar
 - **Kalıcı Depolama**: JSON dosyaları
+
+### İstatistik Sistemi
+- **Veri Kaynağı**: data/chat_history.txt ve mood_counter.txt
+- **Filtreleme**: Bugün/tüm zamanlar + isteğe bağlı duygu
+- **Analiz**: Regex ile mesaj ayrıştırma
+- **Bağımsız Akış**: Ayrı sistem olarak çalışır
 
 ### Frontend
 - **Vanilla JS**: Framework yok
@@ -178,6 +194,7 @@ Tarayıcınızda: `http://localhost:8000/`
 ├── emotion_system.py      # Duygu analizi sistemi
 ├── animal_system.py       # Hayvan API sistemi (2. hafta)
 ├── rag_service.py         # RAG sistemi (4. hafta)
+├── statistic_system.py    # İstatistik sistemi
 ├── static/
 │   ├── app.css           # Tüm stiller
 │   └── app.js            # Frontend mantığı
