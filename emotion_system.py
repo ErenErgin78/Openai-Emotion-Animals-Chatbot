@@ -51,8 +51,14 @@ except Exception:
 
 
 class EmotionChatbot:
-    def __init__(self, client: OpenAI) -> None:
+    def __init__(self, client: OpenAI = None) -> None:
         self.client = client
+        self.use_gemini = False
+        if client is None:
+            self.use_gemini = True
+            # Gemini API'yi yapılandır - sadece API key ile
+            import google.generativeai as genai
+            genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
         self.messages: list[Dict[str, Any]] = []
         self.stats: Dict[str, Any] = {
             "requests": 0,
@@ -94,6 +100,24 @@ class EmotionChatbot:
         """Duygu mesajı uzunluk kontrolü"""
         return len(text) <= MAX_EMOTION_MESSAGE_LENGTH
 
+    def _convert_messages_to_prompt(self, messages: list[Dict[str, Any]]) -> str:
+        """OpenAI mesaj formatını Gemini prompt formatına çevirir"""
+        prompt_parts = []
+        for msg in messages:
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+            if content:
+                if role == "system":
+                    prompt_parts.append(f"Sistem: {content}")
+                elif role == "user":
+                    prompt_parts.append(f"Kullanıcı: {content}")
+                elif role == "assistant":
+                    prompt_parts.append(f"Asistan: {content}")
+                elif role == "function":
+                    function_name = msg.get("name", "")
+                    prompt_parts.append(f"Fonksiyon ({function_name}): {content}")
+        return "\n".join(prompt_parts)
+
     def _load_mood_counts(self) -> Dict[str, int]:
         """Kalıcı duygu sayaçlarını yükler"""
         try:
@@ -129,62 +153,10 @@ class EmotionChatbot:
             pass
 
     def get_functions(self) -> list[Dict[str, Any]]:
-        """OpenAI function calling için fonksiyon tanımlarını döndürür"""
-        return [
-            {
-                "name": "get_emotion_stats",
-                "description": "Duygu sayım özetini döndürür (tümü veya bugün)",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "period": {"type": "string", "enum": ["all", "today"], "description": "Özet periyodu"}
-                    },
-                    "required": []
-                }
-            }
-        ]
+        """Emotion sistemi için function-calling kullanılmıyor (istatistik ayrı sistemde)."""
+        return []
 
-    def get_emotion_stats(self, period: str | None = None) -> Dict[str, Any]:
-        """Duygu istatistiklerini hesaplar ve döndürür"""
-        counts: Dict[str, int] = {m: 0 for m in self.allowed_moods}
-        if period == "today":
-            # chat_history.txt'yi gezip bugün tarihli JSON satırlardan sayım yap
-            today_str = datetime.now().strftime("%Y-%m-%d")
-            try:
-                if CHAT_HISTORY_FILE.exists():
-                    for line in CHAT_HISTORY_FILE.read_text(encoding="utf-8").splitlines():
-                        if not line.strip():
-                            continue
-                        obj = json.loads(line)
-                        ts = str(obj.get("timestamp", ""))
-                        if not ts.startswith(today_str):
-                            continue
-                        # response alanı JSON string olabilir
-                        resp = str(obj.get("response", ""))
-                        # İlk JSON objesini çıkarmayı deneyelim
-                        try:
-                            data = json.loads(resp)
-                        except Exception:
-                            data = None
-                        if isinstance(data, dict):
-                            um = str(data.get("kullanici_ruh_hali", "")).strip()
-                            m1 = str(data.get("ilk_ruh_hali", "")).strip()
-                            m2 = str(data.get("ikinci_ruh_hali", "")).strip()
-                            if um in counts:
-                                counts[um] += 1
-                            if m1 in counts:
-                                counts[m1] += 1
-                            if m2 in counts:
-                                counts[m2] += 1
-            except Exception:
-                pass
-        else:
-            # Varsayılan: tüm zamanlar - mevcut memory sayacını kullan
-            counts = dict(self.emotion_counts)
-
-        summary_parts = [f"{cnt} kez {m.lower()}" for m, cnt in counts.items() if cnt > 0]
-        summary = ", ".join(summary_parts) if summary_parts else "Henüz duygu kaydı yok"
-        return {"counts": counts, "summary": summary, "period": period or "all"}
+    # İstatistik fonksiyonları bu sistemden kaldırıldı; StatisticSystem kullanılacak.
 
     def chat(self, user_message: str) -> Dict[str, Any]:
         """Ana sohbet fonksiyonu - duygu analizi ve yanıt üretir"""
@@ -225,59 +197,40 @@ class EmotionChatbot:
 
         request_debug = _messages_to_debug(messages_payload)
 
-        completion = self.client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=messages_payload,
-            functions=self.get_functions(),
-            function_call="auto",
-            temperature=0.2,
-        )
+        if self.use_gemini:
+            # Gemini API kullan - sadece API key ile
+            import google.generativeai as genai
+            model = genai.GenerativeModel('gemini-2.5-flash')
+            # Gemini için mesajları düz metne çevir
+            prompt_text = self._convert_messages_to_prompt(messages_payload)
+            response = model.generate_content(prompt_text)
+            # Gemini response'unu OpenAI formatına çevir
+            completion = type('obj', (object,), {
+                'choices': [type('obj', (object,), {
+                    'message': type('obj', (object,), {
+                        'content': response.text,
+                        'function_call': None
+                    })()
+                })()]
+            })()
+        else:
+            # OpenAI API kullan
+            completion = self.client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=messages_payload,
+                functions=self.get_functions(),
+                function_call="auto",
+                temperature=0.2,
+            )
 
         msg = completion.choices[0].message
 
-        # Eğer AI bir fonksiyon çağırdıysa (örn. özet istemi)
-        if getattr(msg, "function_call", None):
-            function_name = msg.function_call.name
-            if function_name == "get_emotion_stats":
-                period_arg = None
-                try:
-                    if hasattr(msg.function_call, "arguments") and msg.function_call.arguments:
-                        args_obj = json.loads(msg.function_call.arguments)
-                        period_arg = args_obj.get("period")
-                except Exception:
-                    period_arg = None
-                result = self.get_emotion_stats(period=period_arg)
+        # Emotion sistemi function-calling kullanmaz; istatistikler ayrı sistemdedir.
 
-                # Konuşmaya fonksiyon çağrısını ve sonucunu ekle
-                self.messages.append({
-                    "role": "assistant",
-                    "content": None,
-                    "function_call": msg.function_call
-                })
-                self.messages.append({
-                    "role": "function",
-                    "name": function_name,
-                    "content": json.dumps(result, ensure_ascii=False)
-                })
-
-                # Final yanıt metni
-                messages_payload.append({"role": "assistant", "content": None, "function_call": msg.function_call})
-                messages_payload.append({"role": "function", "name": function_name, "content": json.dumps(result, ensure_ascii=False)})
-                final = self.client.chat.completions.create(
-                    model="gpt-3.5-turbo",
-                    messages=messages_payload,
-                    temperature=0.2,
-                )
-                text = final.choices[0].message.content or ""
-                # Geçmişe son konuşmayı kaydet: kullanıcı + asistan cevabı
-                self.messages.append({"role": "user", "content": user_message})
-                self.messages.append({"role": "assistant", "content": text})
-                # Ham chat'i kaydet
-                self._append_chat_history(user_message, text)
-                return {"response": text, "request_debug": request_debug}
-
-        # Aksi halde modelden JSON bekliyoruz (duygu sınıflandırma)
+        # Aksi halde modelden JSON veya fonksiyon benzeri metin bekliyoruz
         content = msg.content or ""
+
+        # İstatistik düz metin yakalama kaldırıldı; STATS akışına devredildi.
 
         def extract_json_object(text: str) -> Dict[str, Any] | None:
             # code fence temizle

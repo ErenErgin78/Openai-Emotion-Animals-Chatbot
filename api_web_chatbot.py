@@ -26,6 +26,7 @@ from langchain.memory import ConversationSummaryBufferMemory
 
 # Sistem modüllerini import et
 from emotion_system import EmotionChatbot
+from statistic_system import StatisticSystem
 from animal_system import route_animals, _animal_emoji
 from rag_service import rag_service
 
@@ -33,8 +34,51 @@ load_dotenv()
 
 app = FastAPI(title="CHAIN SYSTEM - Akıllı Chatbot Sistemi", version="3.0.0")
 
-# LangChain LLM instance
-llm = OpenAI(temperature=0.1, max_tokens=1000, request_timeout=15)
+# LangChain LLM instance - Fallback mekanizması ile
+def get_llm():
+    """OpenAI API geçersizse Gemini'yi kullan"""
+    try:
+        # OpenAI API'yi test et
+        print("[LLM] OpenAI API test ediliyor...")
+        test_llm = OpenAI(temperature=0.1, max_tokens=1000, request_timeout=15)
+        # Basit bir test çağrısı yap
+        test_result = test_llm.invoke("test")
+        print(f"[LLM] OpenAI test sonucu: {test_result}")
+        print("[LLM] OpenAI API kullanılıyor")
+        return test_llm
+    except Exception as e:
+        print(f"[LLM] OpenAI API hatası: {e}")
+        try:
+            # Gemini API'yi test et - sadece API key ile
+            print("[LLM] Gemini API test ediliyor...")
+            import google.generativeai as genai
+            api_key = os.getenv("GEMINI_API_KEY")
+            if not api_key:
+                raise Exception("GEMINI_API_KEY bulunamadı")
+            genai.configure(api_key=api_key)
+            
+            # LangChain olmadan direkt Gemini kullan
+            model = genai.GenerativeModel('gemini-2.5-flash')
+            # Test çağrısı yap
+            response = model.generate_content("test")
+            print(f"[LLM] Gemini test sonucu: {response.text}")
+            
+            # LangChain wrapper oluştur - Google Cloud credentials olmadan
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            gemini_llm = ChatGoogleGenerativeAI(
+                model="gemini-2.5-flash",
+                temperature=0.1,
+                max_tokens=1000,
+                request_timeout=15,
+                google_api_key=api_key
+            )
+            print("[LLM] Gemini API kullanılıyor")
+            return gemini_llm
+        except Exception as gemini_error:
+            print(f"[LLM] Gemini API hatası: {gemini_error}")
+            raise Exception(f"API hatası - OpenAI: {e}, Gemini: {gemini_error}")
+
+llm = get_llm()
 
 # =============================================================================
 # CONVERSATIONSUMMARYBUFFERMEMORY - GLOBAL MEMORY SİSTEMİ
@@ -94,7 +138,7 @@ class FlowDecisionParser(BaseOutputParser):
     def parse(self, text: str) -> str:
         """LLM çıktısını temizleyip akış kararını döndürür"""
         text = text.strip().upper()
-        valid_flows = ["ANIMAL", "RAG", "EMOTION", "HELP"]
+        valid_flows = ["ANIMAL", "RAG", "EMOTION", "STATS", "HELP"]
         
         for flow in valid_flows:
             if flow in text:
@@ -149,21 +193,50 @@ def create_flow_decision_chain():
 1. Eğer kullanıcı BİLGİ istiyorsa (nedir, nasıl, açıkla, tanım, principle, concept, theory) → RAG
 2. Eğer kullanıcı HAYVAN istiyorsa (köpek, kedi, tilki, ördek fotoğraf/bilgi) → ANIMAL  
 3. Eğer kullanıcı SOHBET/DUYGU istiyorsa (merhaba, nasılsın, üzgünüm, mutluyum) → EMOTION
-4. Eğer kullanıcı hiçbir özelliği çağırmıyorsa (genel sorular, yardım, ne yapabilirsin) → HELP
+4. Eğer kullanıcı İSTATİSTİK/ÖZET istiyorsa ("kaç kez/defa", "istatistik", "özet", belirli duygu istatistiği, bugün/bugüne ait sayım) → STATS
+5. Eğer kullanıcı hiçbir özelliği çağırmıyorsa (genel sorular, yardım, ne yapabilirsin) → HELP
 
 Akışlar:
 - ANIMAL: Köpek, kedi, tilki, ördek fotoğraf/bilgi isteği
 - RAG: Python, Anayasa, Clean Architecture, teknik terimler, bilgi soruları, "nedir", "nasıl", "açıkla", "tanım", "principle", "concept"
 - EMOTION: Duygu analizi, sohbet, normal konuşma
+- STATS: Duygu istatistikleri (today/all + isteğe bağlı duygu filtresi)
 - HELP: Yardım, ne yapabilirsin, genel bilgi istekleri
 
 Kullanıcı Mesajı: {input}
 
-Sadece şu yanıtlardan birini ver: ANIMAL, RAG, EMOTION, HELP"""
+Sadece şu yanıtlardan birini ver: ANIMAL, RAG, EMOTION, STATS, HELP"""
     )
     
-    # RunnableSequence kullanarak modern LangChain syntax
-    return flow_prompt | llm | FlowDecisionParser()
+    def flow_processor(input_data):
+        """Flow decision işleyicisi - Gemini ve OpenAI çıktılarını normalize eder"""
+        result = (flow_prompt | llm).invoke(input_data)
+        
+        # Ham cevabı konsola yazdır
+        print(f"[FLOW DEBUG] Ham result tipi: {type(result)}")
+        print(f"[FLOW DEBUG] Ham result: {result}")
+        
+        # Gemini ve OpenAI çıktılarını normalize et
+        if hasattr(result, 'content'):
+            # LangChain response objesi
+            text = result.content
+            print(f"[FLOW DEBUG] Content: {text}")
+        elif isinstance(result, str):
+            # String çıktı
+            text = result
+            print(f"[FLOW DEBUG] String: {text}")
+        else:
+            # Diğer durumlar için string'e çevir
+            text = str(result)
+            print(f"[FLOW DEBUG] String'e çevriliyor: {text}")
+        
+        # FlowDecisionParser'ı kullan
+        parser = FlowDecisionParser()
+        parsed_result = parser.parse(text)
+        print(f"[FLOW DEBUG] Parsed result: {parsed_result}")
+        return parsed_result
+    
+    return flow_processor
 
 
 def create_rag_chain():
@@ -182,8 +255,29 @@ SORU: {input}
 YANIT:"""
     )
     
-    # RunnableSequence kullanarak modern LangChain syntax
-    return rag_prompt | llm
+    def rag_processor(input_data):
+        """RAG işleyicisi - Gemini ve OpenAI çıktılarını normalize eder"""
+        result = (rag_prompt | llm).invoke(input_data)
+        
+        # Ham cevabı konsola yazdır
+        print(f"[RAG DEBUG] Ham result tipi: {type(result)}")
+        print(f"[RAG DEBUG] Ham result: {result}")
+        
+        # Gemini ve OpenAI çıktılarını normalize et
+        if hasattr(result, 'content'):
+            # LangChain response objesi
+            print(f"[RAG DEBUG] Content: {result.content}")
+            return result.content
+        elif isinstance(result, str):
+            # String çıktı
+            print(f"[RAG DEBUG] String: {result}")
+            return result
+        else:
+            # Diğer durumlar için string'e çevir
+            print(f"[RAG DEBUG] String'e çevriliyor: {str(result)}")
+            return str(result)
+    
+    return rag_processor
 
 
 def create_animal_chain():
@@ -251,10 +345,23 @@ def create_emotion_chain():
         # Memory sistemi ile konuşma geçmişi otomatik olarak yönetiliyor
         global chatbot_instance
         if chatbot_instance is None:
-            # OpenAI client oluştur - llm değil client kullan
-            from openai import OpenAI
-            client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-            chatbot_instance = EmotionChatbot(client)
+            # Fallback mekanizması ile client oluştur
+            try:
+                from openai import OpenAI
+                client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+                # Test çağrısı yap
+                client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[{"role": "user", "content": "test"}],
+                    max_tokens=1
+                )
+                chatbot_instance = EmotionChatbot(client)
+                print("[EMOTION] OpenAI API kullanılıyor")
+            except Exception as e:
+                print(f"[EMOTION] OpenAI API hatası: {e}")
+                # Gemini kullan
+                chatbot_instance = EmotionChatbot()  # client=None, Gemini kullanacak
+                print("[EMOTION] Gemini API kullanılıyor")
         
         # Memory sistemi ile önceki konuşma geçmişi otomatik olarak yönetiliyor
         
@@ -282,6 +389,23 @@ def create_emotion_chain():
     return emotion_processor
 
 
+def create_stats_chain():
+    """Stats chain'i oluşturur - data/ dosyalarından hesaplar"""
+    stats_system = StatisticSystem()
+
+    def stats_processor(user_message: str) -> Dict[str, Any]:
+        try:
+            result = stats_system.answer(user_message)
+            # Memory'ye kaydet
+            memory.save_context({"input": user_message}, {"output": result.get("response", "")})
+            return result
+        except Exception as e:
+            err = f"İstatistik sistemi hatası: {e}"
+            memory.save_context({"input": user_message}, {"output": err})
+            return {"response": err}
+
+    return stats_processor
+
 # =============================================================================
 # CHAIN SYSTEM - Ana İşlem Zinciri
 # =============================================================================
@@ -294,6 +418,7 @@ def create_main_processing_chain():
     rag_chain = create_rag_chain()
     animal_processor = create_animal_chain()
     emotion_processor = create_emotion_chain()
+    stats_processor = create_stats_chain()
     
     def process_message(user_message: str) -> Dict[str, Any]:
         """Ana mesaj işleme fonksiyonu - ConversationSummaryBufferMemory ile"""
@@ -303,27 +428,36 @@ def create_main_processing_chain():
             # Memory sistemi aktif - ConversationSummaryBufferMemory ile konuşma geçmişi yönetiliyor
             
             # AŞAMA 1: Akış kararı
-            flow_result = flow_decision_chain.invoke({"input": user_message})
-            # LangChain chain'leri direkt string döndürür, dict değil
-            flow_decision = flow_result if isinstance(flow_result, str) else str(flow_result)
+            flow_decision = flow_decision_chain({"input": user_message})
             print(f"[CHAIN SYSTEM] Akış kararı: {flow_decision}")
             
             # AŞAMA 2: Seçilen akışa göre işleme
             if flow_decision == "RAG":
                 print("[CHAIN SYSTEM] AŞAMA 2: RAG akışı çalışıyor...")
-                return _process_rag_flow(user_message, rag_chain)
+                rag_result = _process_rag_flow(user_message, rag_chain)
+                if rag_result is None:
+                    print("[CHAIN SYSTEM] RAG sonucu None, HELP akışına yönlendiriliyor...")
+                    return _process_help_flow(user_message)
+                return rag_result
             elif flow_decision == "ANIMAL":
                 print("[CHAIN SYSTEM] AŞAMA 2: Animal akışı çalışıyor...")
                 return animal_processor(user_message)
             elif flow_decision == "EMOTION":
                 print("[CHAIN SYSTEM] AŞAMA 2: Emotion akışı çalışıyor...")
                 return emotion_processor(user_message)
+            elif flow_decision == "STATS":
+                print("[CHAIN SYSTEM] AŞAMA 2: Stats akışı çalışıyor...")
+                return stats_processor(user_message)
             elif flow_decision == "HELP":
                 print("[CHAIN SYSTEM] AŞAMA 2: Help akışı çalışıyor...")
-                return _process_help_flow(user_message)
+                result = _process_help_flow(user_message)
+                print(f"[CHAIN SYSTEM] Help result: {result}")
+                return result
             else:
                 print("[CHAIN SYSTEM] Fallback: Help akışı çalışıyor...")
-                return _process_help_flow(user_message)
+                result = _process_help_flow(user_message)
+                print(f"[CHAIN SYSTEM] Fallback result: {result}")
+                return result
                 
         except Exception as e:
             print(f"[CHAIN SYSTEM] Hata: {e}")
@@ -346,19 +480,17 @@ def _process_rag_flow(user_message: str, rag_chain) -> Dict[str, Any] | None:
     elif "python" in t:
         source = "Learning_Python.pdf"
     else:
-        # If generic question, try general retrieval (no source filter)
-        keywords = ["pdf", "belge", "doküman", "özetle", "açıkla", "nedir", "nasıl", "anlat", "tanım"]
-        if not any(k in t for k in keywords):
-            return None
+        # LLM RAG seçtiyse anahtar kelime kontrolü yapmadan genel retrieval dene
         chunks = rag_service.retrieve_top(user_message, top_k=4)
         if not chunks:
+            print("[RAG] RAG'de ilgili bilgi bulunamadı")
             return None
         context = "\n\n".join([c.get("text", "") for c in chunks])
         sources = list({(c.get("metadata", {}) or {}).get("source", "?") for c in chunks})
         
         # RAG chain ile işle - context'i prompt'a dahil et
         combined_input = f"BAĞLAM:\n{context}\n\nSORU: {user_message}"
-        result = rag_chain.invoke({"input": combined_input})
+        result = rag_chain({"input": combined_input})
         
         # Memory'ye RAG yanıtını kaydet
         memory.save_context(
@@ -388,7 +520,7 @@ def _process_rag_flow(user_message: str, rag_chain) -> Dict[str, Any] | None:
     
     # RAG chain ile işle - context'i prompt'a dahil et
     combined_input = f"BAĞLAM:\n{context}\n\nSORU: {user_message}"
-    result = rag_chain.invoke({"input": combined_input})
+    result = rag_chain({"input": combined_input})
     
     # Memory'ye RAG yanıtını kaydet
     memory.save_context(
@@ -481,12 +613,26 @@ def chat(payload: Dict[str, Any]) -> Dict[str, Any]:
         # CHAIN SYSTEM ile mesaj işleme
         print("[CHAIN SYSTEM] Mesaj işleniyor...")
         result = main_chain(user_message)
+        
+        # Result'u kontrol et ve hata varsa düzelt
+        if isinstance(result, dict) and "error" in result:
+            print(f"[CHAIN SYSTEM] Hata tespit edildi: {result['error']}")
+            return {"error": result["error"]}
+        
+        # Result'un geçerli olduğundan emin ol
+        if not isinstance(result, dict):
+            print(f"[CHAIN SYSTEM] Geçersiz result tipi: {type(result)}")
+            return {"error": "Geçersiz response formatı"}
+            
+        print(f"[CHAIN SYSTEM] Başarılı response: {result}")
         return result
 
     except HTTPException as e:
+        print(f"[CHAIN SYSTEM] HTTPException: {e.detail}")
         return {"error": e.detail}
     except Exception as e:
-        return {"error": str(e)}
+        print(f"[CHAIN SYSTEM] Exception: {str(e)}")
+        return {"error": f"Sunucu hatası: {str(e)}"}
 
 
 # Çalıştırma:

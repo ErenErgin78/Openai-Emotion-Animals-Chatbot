@@ -9,6 +9,7 @@ Köpek, kedi, tilki, ördek için fotoğraf ve bilgi isteklerini işler.
 import httpx
 import re
 import html
+import os
 from typing import Dict, Any
 
 # Güvenlik sabitleri
@@ -60,8 +61,6 @@ ANIMAL_FUNCTIONS_SPEC = [
 ANIMAL_SYSTEM_PROMPT = (
     "Kullanıcının niyetini tespit et ve sadece açık HAYVAN isteği varsa uygun hayvan fonksiyonunu çağır. "
     "Seçenekler: dog_photo, dog_facts, cat_facts, cat_photo, fox_photo, duck_photo. "
-    "Mesajda 'köpek/dog', 'kedi/cat', 'tilki/fox', 'ördek/duck' anahtar kelimeleri YOKSA kesinlikle fonksiyon çağırma. "
-    "PDF, ders, kitap, teori, Python, Anayasa, Clean Architecture gibi bilgi taleplerinde fonksiyon çağırma. "
     "Net hayvan isteği yoksa FONKSİYON ÇAĞIRMA ve normal akışa bırak."
 )
 
@@ -222,12 +221,9 @@ def route_animals(user_message: str, client) -> dict | None:
     if user_message == "[Güvenlik nedeniyle mesaj filtrelendi]":
         return {"type": "text", "animal": "error", "text": "Güvenlik nedeniyle mesaj filtrelendi"}
     
-    # Ön filtre: mesajda hayvan anahtar kelimesi yoksa hiç deneme
-    tl = user_message.lower()
-    if not ("köpek" in tl or "dog" in tl or "kedi" in tl or "cat" in tl or "tilki" in tl or "fox" in tl or "ördek" in tl or "duck" in tl):
-        return None
     # OpenAI modeli ile fonksiyon çağırma dene; olmazsa anahtar kelimeye düş
     try:
+        # OpenAI API test et
         completion = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
@@ -252,5 +248,50 @@ def route_animals(user_message: str, client) -> dict | None:
         }
         func = mapping.get(fn_name)
         return func() if func else None
-    except Exception:
-        return _animal_keyword_router(user_message)
+    except Exception as e:
+        print(f"[ANIMAL] OpenAI API hatası: {e}")
+        # OpenAI başarısız olursa Gemini ile dene
+        try:
+            # Gemini API'yi yapılandır - sadece API key ile
+            import google.generativeai as genai
+            genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+            model = genai.GenerativeModel('gemini-2.5-flash')
+            
+            # Gemini için prompt oluştur
+            prompt = f"""
+{ANIMAL_SYSTEM_PROMPT}
+
+Kullanıcı mesajı: {user_message}
+
+Bu mesajda hangi hayvan API'sini çağırmam gerekiyor? Sadece şu seçeneklerden birini seç:
+- dog_photo: Köpek fotoğrafı
+- dog_facts: Köpek bilgisi  
+- cat_facts: Kedi bilgisi
+- cat_photo: Kedi fotoğrafı
+- fox_photo: Tilki fotoğrafı
+- duck_photo: Ördek fotoğrafı
+
+Sadece fonksiyon adını yazın, başka bir şey yazmayın.
+"""
+            
+            response = model.generate_content(prompt)
+            fn_name = response.text.strip()
+            
+            mapping = {
+                "dog_photo": dog_photo,
+                "dog_facts": dog_facts,
+                "cat_facts": cat_facts,
+                "cat_photo": cat_photo,
+                "fox_photo": fox_photo,
+                "duck_photo": duck_photo,
+            }
+            if fn_name in mapping:
+                print(f"[ANIMAL] Gemini API kullanılıyor: {fn_name}")
+                return mapping[fn_name]()
+            else:
+                # LLM fonksiyon öneremedi; sonuç yok
+                return None
+        except Exception as gemini_error:
+            print(f"[ANIMAL] Gemini API hatası: {gemini_error}")
+            # LLM başarısızsa sonuç yok dön
+            return None
