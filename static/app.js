@@ -444,9 +444,9 @@
             { id: 'fn-fox_photo', side: 'right', prompt: 'Bana bir tilki fotoğrafı ver', top: 360, right: 32 },
             { id: 'fn-duck_photo', side: 'right', prompt: 'Bana bir ördek fotoğrafı ver', top: 420, right: 32 },
             // RAG PDF nodes (left side near RAG parent)
-            { id: 'fn-pdf-python', side: 'left', prompt: 'Python PDF bağlamıyla: Python nedir?', top: 140, left: 32 },
-            { id: 'fn-pdf-anayasa', side: 'left', prompt: 'Anayasa PDF bağlamıyla: Temel haklar nedir?', top: 200, left: 32 },
-            { id: 'fn-pdf-clean', side: 'left', prompt: 'Clean Architecture PDF bağlamıyla: Entities nedir?', top: 260, left: 32 },
+            { id: 'fn-pdf-python', side: 'left', prompt: 'Kedi bakımı PDF bağlamıyla: Kediler nerede barınmalı?', top: 140, left: 32 },
+            { id: 'fn-pdf-anayasa', side: 'left', prompt: 'Papağan bakımı PDF bağlamıyla: Papağan yaygın hastalıkları nelerdir?', top: 200, left: 32 },
+            { id: 'fn-pdf-clean', side: 'left', prompt: 'Tavşan bakımı PDF bağlamıyla: Tavşan nasıl beslenmeli?', top: 260, left: 32 },
         ];
 
         // Child→Parent grouping map (key without 'fn-')
