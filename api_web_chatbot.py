@@ -21,7 +21,6 @@ from dotenv import load_dotenv
 # LangChain imports
 from langchain_openai import OpenAI
 from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain, SequentialChain
 from langchain.schema import BaseOutputParser
 from langchain.memory import ConversationSummaryBufferMemory
 
@@ -95,13 +94,13 @@ class FlowDecisionParser(BaseOutputParser):
     def parse(self, text: str) -> str:
         """LLM çıktısını temizleyip akış kararını döndürür"""
         text = text.strip().upper()
-        valid_flows = ["ANIMAL", "RAG", "EMOTION"]
+        valid_flows = ["ANIMAL", "RAG", "EMOTION", "HELP"]
         
         for flow in valid_flows:
             if flow in text:
                 return flow
         
-        return "EMOTION"  # Varsayılan fallback
+        return "HELP"  # Varsayılan fallback - yardım mesajı
 
 
 def _sanitize_input(text: str) -> str:
@@ -150,24 +149,21 @@ def create_flow_decision_chain():
 1. Eğer kullanıcı BİLGİ istiyorsa (nedir, nasıl, açıkla, tanım, principle, concept, theory) → RAG
 2. Eğer kullanıcı HAYVAN istiyorsa (köpek, kedi, tilki, ördek fotoğraf/bilgi) → ANIMAL  
 3. Eğer kullanıcı SOHBET/DUYGU istiyorsa (merhaba, nasılsın, üzgünüm, mutluyum) → EMOTION
+4. Eğer kullanıcı hiçbir özelliği çağırmıyorsa (genel sorular, yardım, ne yapabilirsin) → HELP
 
 Akışlar:
 - ANIMAL: Köpek, kedi, tilki, ördek fotoğraf/bilgi isteği
 - RAG: Python, Anayasa, Clean Architecture, teknik terimler, bilgi soruları, "nedir", "nasıl", "açıkla", "tanım", "principle", "concept"
 - EMOTION: Duygu analizi, sohbet, normal konuşma
+- HELP: Yardım, ne yapabilirsin, genel bilgi istekleri
 
 Kullanıcı Mesajı: {input}
 
-Sadece şu yanıtlardan birini ver: ANIMAL, RAG, EMOTION"""
+Sadece şu yanıtlardan birini ver: ANIMAL, RAG, EMOTION, HELP"""
     )
     
-    return LLMChain(
-        llm=llm,
-        prompt=flow_prompt,
-        memory=memory,  # Memory sistemi entegrasyonu
-        output_parser=FlowDecisionParser(),
-        output_key="flow_decision"
-    )
+    # RunnableSequence kullanarak modern LangChain syntax
+    return flow_prompt | llm | FlowDecisionParser()
 
 
 def create_rag_chain():
@@ -186,12 +182,8 @@ SORU: {input}
 YANIT:"""
     )
     
-    return LLMChain(
-        llm=llm,
-        prompt=rag_prompt,
-        memory=memory,  # Memory sistemi entegrasyonu
-        output_key="rag_response"
-    )
+    # RunnableSequence kullanarak modern LangChain syntax
+    return rag_prompt | llm
 
 
 def create_animal_chain():
@@ -311,7 +303,7 @@ def create_main_processing_chain():
             # Memory sistemi aktif - ConversationSummaryBufferMemory ile konuşma geçmişi yönetiliyor
             
             # AŞAMA 1: Akış kararı
-            flow_result = flow_decision_chain.run(input=user_message)
+            flow_result = flow_decision_chain.invoke({"input": user_message})
             # LangChain chain'leri direkt string döndürür, dict değil
             flow_decision = flow_result if isinstance(flow_result, str) else str(flow_result)
             print(f"[CHAIN SYSTEM] Akış kararı: {flow_decision}")
@@ -326,9 +318,12 @@ def create_main_processing_chain():
             elif flow_decision == "EMOTION":
                 print("[CHAIN SYSTEM] AŞAMA 2: Emotion akışı çalışıyor...")
                 return emotion_processor(user_message)
+            elif flow_decision == "HELP":
+                print("[CHAIN SYSTEM] AŞAMA 2: Help akışı çalışıyor...")
+                return _process_help_flow(user_message)
             else:
-                print("[CHAIN SYSTEM] Fallback: Emotion akışı çalışıyor...")
-                return emotion_processor(user_message)
+                print("[CHAIN SYSTEM] Fallback: Help akışı çalışıyor...")
+                return _process_help_flow(user_message)
                 
         except Exception as e:
             print(f"[CHAIN SYSTEM] Hata: {e}")
@@ -363,7 +358,7 @@ def _process_rag_flow(user_message: str, rag_chain) -> Dict[str, Any] | None:
         
         # RAG chain ile işle - context'i prompt'a dahil et
         combined_input = f"BAĞLAM:\n{context}\n\nSORU: {user_message}"
-        result = rag_chain.run(input=combined_input)
+        result = rag_chain.invoke({"input": combined_input})
         
         # Memory'ye RAG yanıtını kaydet
         memory.save_context(
@@ -393,7 +388,7 @@ def _process_rag_flow(user_message: str, rag_chain) -> Dict[str, Any] | None:
     
     # RAG chain ile işle - context'i prompt'a dahil et
     combined_input = f"BAĞLAM:\n{context}\n\nSORU: {user_message}"
-    result = rag_chain.run(input=combined_input)
+    result = rag_chain.invoke({"input": combined_input})
     
     # Memory'ye RAG yanıtını kaydet
     memory.save_context(
@@ -407,6 +402,36 @@ def _process_rag_flow(user_message: str, rag_chain) -> Dict[str, Any] | None:
         "response": result if isinstance(result, str) else str(result),
         "rag_source": ui.get("id"),
         "rag_emoji": ui.get("emoji"),
+    }
+
+
+def _process_help_flow(user_message: str) -> Dict[str, Any]:
+    """Help akışını işler - kullanıcıya yönlendirici mesaj verir"""
+    help_message = """🤖 Merhaba! Ben akıllı bir chatbot'um ve size şu özelliklerle yardımcı olabilirim:
+
+📚 **BİLGİ SİSTEMİ (RAG)**: 
+• Python, Anayasa, Clean Architecture konularında sorular sorabilirsiniz
+• "Python nedir?", "Clean Architecture principles" gibi sorular
+
+🐶 **HAYVAN SİSTEMİ**:
+• Köpek, kedi, tilki, ördek fotoğraf ve bilgileri
+• "köpek fotoğrafı ver", "kedi bilgisi ver" gibi istekler
+
+💭 **DUYGU ANALİZİ**:
+• Duygularınızı analiz eder ve size uygun yanıtlar verir
+• "Bugün çok mutluyum", "Üzgün hissediyorum" gibi mesajlar
+
+🎯 **KULLANIM**: Ekranda gördüğünüz kutucukları kullanarak veya yukarıdaki örnekler gibi mesajlar göndererek bu chatbot'u kullanabilirsiniz!"""
+    
+    # Memory'ye help yanıtını kaydet
+    memory.save_context(
+        {"input": user_message},
+        {"output": help_message}
+    )
+    
+    return {
+        "help": True,
+        "response": help_message
     }
 
 
