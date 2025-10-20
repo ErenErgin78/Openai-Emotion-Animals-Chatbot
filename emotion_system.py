@@ -371,11 +371,4 @@ Görevin şunlardır:
 
 Seçilebilecek ruh halleri:
 Mutlu, Üzgün, Öfkeli, Şaşkın, Utanmış, Endişeli, Gülümseyen, Flörtöz, Sorgulayıcı, Sorgulayıcı, Yorgun
-
-EK KURALLAR (İstatistik Sorguları):
-- Sadece kullanıcı AÇIKÇA istatistik/özet isterse sınıflandırma JSON'u üretmek yerine şu fonksiyonu çağır: `get_emotion_stats`.
-  - Açıkça istatistik/özet isteme anahtar kelimeleri: "en çok", "istatistik", "özet", "toplam", "kaç kez", "kaç kere", "en sık".
-  - Normal duygu/sohbet mesajlarında ASLA fonksiyon çağırma.
-  - `period` argümanı: İstatistik sorgusunda "bugün"/"günlük" geçiyorsa "today"; aksi halde "all".
-- Fonksiyonun dönüşünden sonra sadece 1 cümlelik, Türkçe, kısa bir özet yaz ve JSON döndürme. Bu kural YALNIZCA istatistik sorguları için geçerlidir.
 """

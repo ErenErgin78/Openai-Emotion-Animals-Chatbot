@@ -116,11 +116,11 @@ DANGEROUS_PATTERNS = [
     r'<meta[^>]*>',  # Meta injection
 ]
 
-# RAG kaynakları
+# RAG kaynakları (UI id'leri sabit: pdf-python/anayasa/clean)
 RAG_SOURCES = {
-    "Learning_Python.pdf": {"id": "pdf-python", "emoji": "🐍", "alias": "python"},
-    "gerekceli_anayasa.pdf": {"id": "pdf-anayasa", "emoji": "⚖️", "alias": "anayasa"},
-    "clean_architecture.pdf": {"id": "pdf-clean", "emoji": "🏗️", "alias": "clean"},
+    "cat_care.pdf": {"id": "pdf-python", "emoji": "🐱", "alias": "cat"},
+    "parrot_care.pdf": {"id": "pdf-anayasa", "emoji": "🦜", "alias": "parrot"},
+    "rabbit_care.pdf": {"id": "pdf-clean", "emoji": "🐰", "alias": "rabbit"},
 }
 
 # Static files (CSS/JS)
@@ -190,7 +190,7 @@ def create_flow_decision_chain():
         template="""Kullanıcının mesajını analiz et ve şu akışlardan birini seç:
 
 ÖNEMLİ KURALLAR:
-1. Eğer kullanıcı BİLGİ istiyorsa (nedir, nasıl, açıkla, tanım, principle, concept, theory) → RAG
+1. Eğer kullanıcı BİLGİ istiyorsa (hayvan bakımı, beslenme, barınma, sağlık, eğitim, bakım önerileri) → RAG
 2. Eğer kullanıcı HAYVAN istiyorsa (köpek, kedi, tilki, ördek fotoğraf/bilgi) → ANIMAL  
 3. Eğer kullanıcı SOHBET/DUYGU istiyorsa (merhaba, nasılsın, üzgünüm, mutluyum) → EMOTION
 4. Eğer kullanıcı İSTATİSTİK/ÖZET istiyorsa ("kaç kez/defa", "istatistik", "özet", belirli duygu istatistiği, bugün/bugüne ait sayım) → STATS
@@ -198,7 +198,7 @@ def create_flow_decision_chain():
 
 Akışlar:
 - ANIMAL: Köpek, kedi, tilki, ördek fotoğraf/bilgi isteği
-- RAG: Python, Anayasa, Clean Architecture, teknik terimler, bilgi soruları, "nedir", "nasıl", "açıkla", "tanım", "principle", "concept"
+- RAG: Kedi/Papağan/Tavşan bakımı, beslenme, barınma, sağlık, eğitim, bakım rutinleri
 - EMOTION: Duygu analizi, sohbet, normal konuşma
 - STATS: Duygu istatistikleri (today/all + isteğe bağlı duygu filtresi)
 - HELP: Yardım, ne yapabilirsin, genel bilgi istekleri
@@ -245,10 +245,9 @@ def create_rag_chain():
     # Context bilgisi prompt'a dahil edilir, memory sistemi konuşma geçmişini yönetir
     rag_prompt = PromptTemplate(
         input_variables=["input"],
-        template="""Sen bir bilgi asistanısın. Kullanıcının sorularını verilen bağlam bilgilerini kullanarak yanıtla. 
-Türkçe, kısa ve net yanıtlar ver. Bağlam bilgisini kullan ama gereksiz detay verme. 
-Eğer bağlamda yeterli bilgi yoksa bunu belirt. Yanıtını doğrudan metin olarak ver (JSON formatında değil). 
-Maksimum 5 cümle ile yanıtla.
+        template="""Sen bir hayvan bakımı bilgi asistanısın. Verilen bağlam (PDF parçaları) üzerinden
+kullanıcının sorusunu yanıtla. Türkçe, kısa ve net yaz. Bağlamı kullan; bağlamda bilgi yoksa bunu açıkça söyle.
+Yanıtını doğrudan düz metin olarak ver (JSON değil). Maksimum 5 cümle.
 
 SORU: {input}
 
@@ -470,15 +469,13 @@ def _process_rag_flow(user_message: str, rag_chain) -> Dict[str, Any] | None:
     """RAG akışını işler - PDF'lerden bilgi çeker"""
     t = user_message.lower()
     
-    # Heuristic: explicit source keywords
-    if "anayasa" in t:
-        source = "gerekceli_anayasa.pdf"
-    elif ("clean architecture" in t or "clean architecture".replace(" ", "_") in t or 
-          ("clean" in t and "architecture" in t) or "acyclic" in t or "dependency" in t or 
-          "principle" in t or "principles" in t or "dependencies" in t):
-        source = "clean_architecture.pdf"
-    elif "python" in t:
-        source = "Learning_Python.pdf"
+    # Heuristic: explicit source keywords (hayvan bakım)
+    if ("kedi" in t or "cat" in t):
+        source = "cat_care.pdf"
+    elif ("papağan" in t or "parrot" in t or "kuş" in t):
+        source = "parrot_care.pdf"
+    elif ("tavşan" in t or "rabbit" in t):
+        source = "rabbit_care.pdf"
     else:
         # LLM RAG seçtiyse anahtar kelime kontrolü yapmadan genel retrieval dene
         chunks = rag_service.retrieve_top(user_message, top_k=4)
@@ -542,8 +539,8 @@ def _process_help_flow(user_message: str) -> Dict[str, Any]:
     help_message = """🤖 Merhaba! Ben akıllı bir chatbot'um ve size şu özelliklerle yardımcı olabilirim:
 
 📚 **BİLGİ SİSTEMİ (RAG)**: 
-• Python, Anayasa, Clean Architecture konularında sorular sorabilirsiniz
-• "Python nedir?", "Clean Architecture principles" gibi sorular
+• Kedi / Papağan / Tavşan bakımı (beslenme, barınma, sağlık, eğitim)
+• "Kedi yavrusu nasıl beslenir?", "Papağan kafes bakımı nasıl yapılır?", "Tavşan tırnak kesimi nasıl yapılır?"
 
 🐶 **HAYVAN SİSTEMİ**:
 • Köpek, kedi, tilki, ördek fotoğraf ve bilgileri
