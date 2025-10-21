@@ -2,6 +2,8 @@
 
 Bu proje, **Kairu LLM eğitiminin tüm haftalarını** birleştiren kapsamlı bir chatbot sistemidir. Her hafta öğrenilen konular, gerçek bir projede uygulanarak pekiştirilmiştir.
 
+- **GitHub**: [ErenErgin78/Openai-Emotion-Animals-Chatbot](https://github.com/ErenErgin78/Openai-Emotion-Animals-Chatbot)
+
 ## 🎓 Eğitim Süreci ve Proje Gelişimi
 
 ### 📚 **1. Hafta: LLM Temelleri**
@@ -241,10 +243,5 @@ Tarayıcınızda: `http://localhost:8000/`
 - **Küçük Node'ler**: Başlangıçta kapalı; tıklayınca açılır
 - **Tek Hat**: Büyük node ile chat arasında tek ip
 - **Renkli Parlama**: RAG=sarı, API=mavi, PLAIN=yeşil
-
----
-
-
-- **GitHub**: [ErenErgin78/Openai-Emotion-Animals-Chatbot](https://github.com/ErenErgin78/Openai-Emotion-Animals-Chatbot)
 
 ---
