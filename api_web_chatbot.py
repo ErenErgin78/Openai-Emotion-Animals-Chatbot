@@ -96,6 +96,100 @@ memory = ConversationSummaryBufferMemory(
 # Global chatbot instance
 chatbot_instance: EmotionChatbot | None = None
 
+# =============================================================================
+# ÖZETLEYİCİ (SUMMARIZER) - Uzun kullanıcı mesajlarını kısaltmak için
+# =============================================================================
+# T5-small ile transformers pipeline kullanılır. Lazy-init yapılır ve tek instance
+# tutulur. Kullanıcı mesajı yaklaşık 200 token'i aşarsa tetiklenir.
+_summarizer_pipeline = None  # Lazy init: ilk kullanımda yüklenir
+
+def _get_device_id() -> int:
+    """Transformers pipeline için cihaz kimliğini döndürür.
+    - CUDA (GPU) mevcutsa 0, değilse -1 (CPU)
+    """
+    try:
+        import torch  # Yerinde import: bağımlılık yoksa hata kontrollü yakalanır
+        return 0 if getattr(torch, "cuda", None) and torch.cuda.is_available() else -1
+    except Exception:
+        # Torch yoksa CPU kullan
+        return -1
+
+
+def _get_summarizer():
+    """T5-small summarization pipeline'ını döndürür (lazy-init)."""
+    global _summarizer_pipeline
+    if _summarizer_pipeline is not None:
+        return _summarizer_pipeline
+    try:
+        # Transformers'ı sadece gerektiğinde yükle
+        from transformers import pipeline  # type: ignore
+        device_id = _get_device_id()
+        _summarizer_pipeline = pipeline(
+            "summarization",
+            model="t5-small",
+            device=device_id,
+        )
+        return _summarizer_pipeline
+    except Exception as e:
+        # Özetleyici yüklenemezse None döndür ve akışı engelleme
+        print(f"[SUMMARIZER] Yükleme hatası: {e}")
+        return None
+
+
+def _summarize_text_if_needed(text: str, estimated_tokens: int, token_threshold: int = 200) -> str:
+    """Mesaj token tahmini eşik değerini aşıyorsa metni kısaltır.
+
+    Güvenlik/sağlamlık notları:
+    - Transformers bağımlılığı yoksa veya model yüklenemezse orijinal metni döndürür
+    - T5 için "summarize:" prefix'i kullanılır; Türkçe girişlerde de çalışır
+    - max_new_tokens/min_new_tokens, girdinin uzunluğuna göre ölçeklenir
+    """
+    try:
+        if estimated_tokens <= token_threshold:
+            return text
+
+        summarizer = _get_summarizer()
+        if summarizer is None:
+            return text
+
+        # T5 özetleme: İngilizce ön-ek; Türkçe için de kabul edilebilir
+        prefixed = "summarize: " + text
+
+        # Tokenizer varsa giriş uzunluğuna göre dinamik ayar yap
+        try:
+            input_len = len(summarizer.tokenizer(prefixed)["input_ids"])  # type: ignore[attr-defined]
+        except Exception:
+            # Tokenizer'a erişilemezse kaba tahmin ile çalış
+            input_len = max(60, len(prefixed) // 4)
+
+        # Çıkış uzunluğu: girişin ~%30-50'si; alt/üst sınırlar güvenlik için
+        new_tokens = max(32, min(160, int(input_len * 0.4)))
+        min_new = max(16, int(new_tokens * 0.4))
+
+        result = summarizer(
+            prefixed,
+            max_new_tokens=new_tokens,
+            min_new_tokens=min_new,
+            do_sample=False,
+        )
+        summary = ""
+        try:
+            summary = (result[0] or {}).get("summary_text", "").strip()
+        except Exception:
+            summary = ""
+
+        # Boş dönerse orijinal metni koru
+        if not summary:
+            return text
+
+        # Konsola kısaltılmış çıktıyı yaz (istenen gereksinim)
+        print(f"[SUMMARIZER] Kısaltılmış metin: {summary}")
+        return summary
+    except Exception as e:
+        # Her türlü hata durumunda orijinal metni döndür
+        print(f"[SUMMARIZER] Çalışma hatası: {e}")
+        return text
+
 # RAG modelini asenkron olarak önceden yükle
 print("[CHAIN SYSTEM] RAG modeli asenkron olarak yükleniyor...")
 rag_service.preload_model_async()
@@ -245,11 +339,17 @@ def create_rag_chain():
     # Context bilgisi prompt'a dahil edilir, memory sistemi konuşma geçmişini yönetir
     rag_prompt = PromptTemplate(
         input_variables=["input"],
-        template="""Sen bir hayvan bakımı bilgi asistanısın. Verilen bağlam (PDF parçaları) üzerinden
-kullanıcının sorusunu yanıtla. Türkçe, kısa ve net yaz. Bağlamı kullan; bağlamda bilgi yoksa bunu açıkça söyle.
-Yanıtını doğrudan düz metin olarak ver (JSON değil). Maksimum 5 cümle.
+        template="""Sen bir hayvan bakımı bilgi asistanısın. Verilen BAĞLAM (PDF parçaları) üzerinden
+kullanıcının sorusunu YALNIZCA bağlama dayanarak yanıtla. Türkçe, kısa, net ve uygulanabilir yaz.
 
-SORU: {input}
+Kesin kurallar:
+1) Doğrudan yanıt ver; bölüm/başlık/"git oku" tarzı yönlendirmeler yapma.
+2) Bağlamdaki bilgileri özlü maddeler halinde veya kısa paragraflarla aktar.
+3) Kaynak ve alıntı isimlerini yazma; sadece içerik ver.
+4) Bağlam yeterli değilse bunu açıkça söyle: "Bağlamda yeterli bilgi yok."
+5) JSON üretme; normal metin ver. Maksimum 5 cümle.
+
+SORU VE BAĞLAM: {input}
 
 YANIT:"""
     )
@@ -436,25 +536,36 @@ def create_main_processing_chain():
                 rag_result = _process_rag_flow(user_message, rag_chain)
                 if rag_result is None:
                     print("[CHAIN SYSTEM] RAG sonucu None, HELP akışına yönlendiriliyor...")
-                    return _process_help_flow(user_message)
+                    help_result = _process_help_flow(user_message)
+                    help_result["flow_type"] = "HELP"
+                    return help_result
+                rag_result["flow_type"] = "RAG"
                 return rag_result
             elif flow_decision == "ANIMAL":
                 print("[CHAIN SYSTEM] AŞAMA 2: Animal akışı çalışıyor...")
-                return animal_processor(user_message)
+                animal_result = animal_processor(user_message)
+                animal_result["flow_type"] = "ANIMAL"
+                return animal_result
             elif flow_decision == "EMOTION":
                 print("[CHAIN SYSTEM] AŞAMA 2: Emotion akışı çalışıyor...")
-                return emotion_processor(user_message)
+                emotion_result = emotion_processor(user_message)
+                emotion_result["flow_type"] = "EMOTION"
+                return emotion_result
             elif flow_decision == "STATS":
                 print("[CHAIN SYSTEM] AŞAMA 2: Stats akışı çalışıyor...")
-                return stats_processor(user_message)
+                stats_result = stats_processor(user_message)
+                stats_result["flow_type"] = "STATS"
+                return stats_result
             elif flow_decision == "HELP":
                 print("[CHAIN SYSTEM] AŞAMA 2: Help akışı çalışıyor...")
                 result = _process_help_flow(user_message)
+                result["flow_type"] = "HELP"
                 print(f"[CHAIN SYSTEM] Help result: {result}")
                 return result
             else:
                 print("[CHAIN SYSTEM] Fallback: Help akışı çalışıyor...")
                 result = _process_help_flow(user_message)
+                result["flow_type"] = "HELP"
                 print(f"[CHAIN SYSTEM] Fallback result: {result}")
                 return result
                 
@@ -478,7 +589,7 @@ def _process_rag_flow(user_message: str, rag_chain) -> Dict[str, Any] | None:
         source = "rabbit_care.pdf"
     else:
         # LLM RAG seçtiyse anahtar kelime kontrolü yapmadan genel retrieval dene
-        chunks = rag_service.retrieve_top(user_message, top_k=4)
+        chunks = rag_service.retrieve_top(user_message, top_k=6)
         if not chunks:
             print("[RAG] RAG'de ilgili bilgi bulunamadı")
             return None
@@ -510,7 +621,7 @@ def _process_rag_flow(user_message: str, rag_chain) -> Dict[str, Any] | None:
         }
 
     # Source-filtered retrieval
-    chunks = rag_service.retrieve_by_source(user_message, source_filename=source, top_k=4)
+    chunks = rag_service.retrieve_by_source(user_message, source_filename=source, top_k=6)
     if not chunks:
         return None
     context = "\n\n".join([c.get("text", "") for c in chunks])
@@ -603,6 +714,10 @@ def chat(payload: Dict[str, Any]) -> Dict[str, Any]:
     
     # Token kontrolü
     estimated_tokens = _estimate_tokens(user_message)
+    # 200+ token ise önce özetlemeyi dene (kaba tahmin üzerinden)
+    user_message = _summarize_text_if_needed(user_message, estimated_tokens, token_threshold=200)
+    # Özet sonrası yeniden tahmini token sayısı al (sert limit için paylaşımcı davranış)
+    estimated_tokens = _estimate_tokens(user_message)
     if estimated_tokens > MAX_TOKENS_PER_REQUEST:
         return {"error": f"Çok fazla token. Maksimum {MAX_TOKENS_PER_REQUEST} token olabilir."}
 
@@ -634,3 +749,18 @@ def chat(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 # Çalıştırma:
 # uvicorn api_web_chatbot:app --host 0.0.0.0 --port 8000 --reload
+
+if __name__ == "__main__":
+    """Script doğrudan çalıştırıldığında Uvicorn ile sunucuyu başlatır.
+    - Host: 0.0.0.0
+    - Port: 8000
+    - Reload: True (geliştirme için otomatik yeniden yükleme)
+    """
+    try:
+        # Uvicorn'u sadece ihtiyaç olduğunda import et (dinamik import)
+        import uvicorn  # type: ignore
+        # Modül:app şeklinde string kullanmak, reload modunda sağlıklı yeniden yükleme sağlar
+        uvicorn.run("api_web_chatbot:app", host="0.0.0.0", port=8000, reload=True)
+    except Exception as e:
+        # Çalışma zamanında oluşabilecek hataları kullanıcıya bildir
+        print(f"[SERVER] Uvicorn başlatma hatası: {e}")

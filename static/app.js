@@ -184,7 +184,23 @@
                     body: JSON.stringify({ message })
                 });
                 const data = await resp.json();
-                removeLoadingMessage();
+                
+                // Response içindeki flow_type'a göre loading mesajını güncelle veya kaldır
+                if (data.flow_type) {
+                    const flowMessages = {
+                        "RAG": "RAG çağırılıyor...",
+                        "ANIMAL": "Hayvan API sistemi çağırılıyor...",
+                        "EMOTION": "Duygu analizi yapılıyor...",
+                        "STATS": "İstatistikler hesaplanıyor...",
+                        "HELP": "Yardım hazırlanıyor..."
+                    };
+                    const flowMessage = flowMessages[data.flow_type] || 'İşleniyor...';
+                    updateLoadingMessage(flowMessage);
+                    // Kısa bir süre güncellenmiş mesajı göster, sonra kaldır
+                    setTimeout(() => removeLoadingMessage(), 300);
+                } else {
+                    removeLoadingMessage();
+                }
 
                 if (data.error) {
                     addMessage('Hata: ' + data.error, false);
@@ -306,14 +322,24 @@
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        function addLoadingMessage() {
+        function addLoadingMessage(message) {
+            // Varsayılan mesaj veya özel mesaj kullan
+            const defaultMessage = message || 'Model düşünüyor...';
             const chatBox = document.getElementById('chat-box');
             const messageDiv = document.createElement('div');
             messageDiv.className = 'message bot loading';
             messageDiv.id = 'loading-message';
-            messageDiv.textContent = 'Model düşünüyor...';
+            messageDiv.textContent = defaultMessage;
             chatBox.appendChild(messageDiv);
             chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function updateLoadingMessage(message) {
+            // Loading mesajını güncelle (response geldiğinde flow_type'a göre)
+            const loadingMsg = document.getElementById('loading-message');
+            if (loadingMsg) {
+                loadingMsg.textContent = message;
+            }
         }
 
         function removeLoadingMessage() {
@@ -411,18 +437,11 @@
         }
 
         function handleRagResponse(data) {
-            // RAG için özel davranış: tek seferde 5 cümle, sonraki tuşu yok
+            // RAG için özel davranış: tüm metni göster (kesme yok)
             const response = data.response || 'Tamam.';
             
-            // Cümleleri ayır (nokta, ünlem, soru işareti ile)
-            const sentences = response.split(/[.!?]+/).filter(s => s.trim().length > 0);
-            
-            // Maksimum 5 cümle al
-            const limitedSentences = sentences.slice(0, 5);
-            const finalResponse = limitedSentences.join('. ') + (limitedSentences.length < sentences.length ? '...' : '');
-            
-            // Tek seferde tüm mesajı ekle (sonraki tuşu yok)
-            addMessage(finalResponse, false);
+            // Tüm metni olduğu gibi göster - kesme veya "..." yok
+            addMessage(response, false);
         }
         function quickPrompt(text) {
             const input = document.getElementById('user-input');

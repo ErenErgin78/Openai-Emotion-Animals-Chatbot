@@ -16,3 +16,8 @@ chromadb==0.5.5
 sentence-transformers==3.0.1
 pypdf==4.3.1
 
+
+# Summarizer (T5-small via transformers)
+transformers==4.45.2
+sentencepiece==0.2.0
+safetensors==0.4.5

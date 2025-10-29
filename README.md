@@ -20,9 +20,10 @@ Bu proje, **Kairu LLM eğitiminin tüm haftalarını** birleştiren kapsamlı bi
   - OpenAI function calling ile akıllı yönlendirme
   - Görsel efektler ve animasyonlar
 
-### 🔧 **3. Hafta: Model Optimizasyonu** *(Ayrı Proje)*
+### 🔧 **3. Hafta: Model Optimizasyonu ve Summarizer Entegrasyonu**
 - **Öğrenilen Konular**: AutoTokenizer & AutoModel, GPT/BERT/T5 karşılaştırması, CPU/GPU performans
-- **Not**: Bu hafta ayrı bir proje olarak geliştirildi
+- **Summarizer Modeli (T5-small)**: Kullanıcı mesajları 200+ token olduğunda otomatik olarak özetleyerek AI'ya gönderilir, böylece token maliyetleri ve işlem süreleri optimize edilir
+- **Projeye Etkisi**: Uzun mesajlar özetlenerek hem API maliyetleri düşürülür hem de sistem performansı artırılır. Summarizer çalıştığında konsola kısaltılmış metin yazdırılır
 
 ### 🧠 **4. Hafta: RAG Sistemleri**
 - **Öğrenilen Konular**: Retrieval-Augmented Generation, vektör veritabanları, embedding
@@ -88,6 +89,12 @@ Bu proje, **Kairu LLM eğitiminin tüm haftalarını** birleştiren kapsamlı bi
 - Belirli duygu istatistikleri
 - data/ klasöründen otomatik veri okuma
 
+### 📝 **Summarizer Modeli (T5-small)**
+- 200+ token olan uzun mesajları otomatik özetler
+- Token maliyetlerini optimize eder
+- API işlem sürelerini kısaltır
+- Konsola özet çıktısı loglar
+
 ### 🎨 **Gelişmiş UI/UX**
 - Sürüklenebilir düğümler ve halat animasyonları
 - Matrix arkaplan efekti
@@ -118,7 +125,7 @@ OPENAI_API_KEY=sk-your-api-key-here
 
 ### 4. PDF Dosyaları
 `PDFs/` klasörüne PDF dosyalarınızı yerleştirin:
-- `Learning_Python.pdf`
+- `.pdf`
 - `gerekceli_anayasa.pdf` 
 - `clean_architecture.pdf`
 
